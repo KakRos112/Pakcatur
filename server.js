@@ -20,7 +20,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const ROOT = __dirname;
 
 // Hanya file game ini yang boleh diunduh (bukan .git, server.js, skrip deploy, dll.)
-const PUBLIC_FILE = /^\/(?:index\.html|CREDITS\.txt|LICENSE|(?:css|js|engine|pieces|licenses)\/[\w.-]+(?:\/[\w.-]+)?|media\/[\w.-]+\.(?:mp4|webm))$/;
+const PUBLIC_FILE = /^\/(?:index\.html|CREDITS\.txt|LICENSE|(?:css|js|engine|pieces|licenses|img)\/[\w.-]+(?:\/[\w.-]+)?|media\/[\w.-]+\.(?:mp4|webm))$/;
 
 // Batas sederhana supaya server tidak mudah dibanjiri saat dibuka ke internet
 const MAX_ROOMS = 300;
