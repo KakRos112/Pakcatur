@@ -1,0 +1,93 @@
+CATUR LAWAN BOT — KREDIT & LISENSI PIHAK KETIGA
+================================================
+
+Game ini memakai beberapa karya pihak ketiga. Daftar di bawah ini menyebutkan
+pembuatnya, lisensinya, dan lokasi teks lisensi lengkap di folder "licenses/".
+Saat membagikan game ini (ZIP, website, atau .exe), sertakan file ini dan
+folder "licenses/" tanpa diubah.
+
+
+1. MESIN CATUR — STOCKFISH 10 (versi JavaScript)
+------------------------------------------------
+File        : engine/stockfish.js, engine/stockfish-src.js
+Versi       : stockfish.js 10.0.2
+Pembuat     : T. Romstad, M. Costalba, J. Kiiski, G. Linscott, dan kontributor
+              Stockfish. Dukungan multi-varian oleh Daniel Dugovic dan
+              kontributor. Dikompilasi ke JavaScript oleh Niklas Fiekas.
+Lisensi     : GNU General Public License versi 3 (GPL-3.0)
+Teks        : licenses/GPL-3.0.txt
+Kode sumber : https://github.com/niklasf/stockfish.js
+              https://github.com/ddugovic/Stockfish
+              https://github.com/official-stockfish/Stockfish
+Perubahan   : engine/stockfish-src.js berisi engine/stockfish.js yang sama
+              persis, hanya dibungkus dalam satu fungsi JavaScript
+              (window.STOCKFISH_FN) agar bisa dijalankan sebagai Web Worker
+              saat game dibuka langsung dari file (tanpa server).
+              Kode mesinnya sendiri tidak diubah.
+
+Stockfish adalah program terpisah yang dijalankan di Web Worker dan
+berkomunikasi lewat protokol UCI. Sesuai GPL-3.0, siapa pun yang menerima
+game ini berhak mendapatkan kode sumber Stockfish dari tautan di atas.
+
+
+2. GAMBAR BIDAK CATUR
+---------------------
+Semua set bidak diambil dari repositori Lichess (https://github.com/lichess-org/lila,
+folder public/piece/). Lisensi tiap set:
+
+  Folder                  Nama di game  Pembuat                        Lisensi
+  ----------------------  ------------  -----------------------------  -------------------
+  pieces/cburnett/        Klasik        Colin M.L. Burnett             GPL-2.0 atau lebih baru
+  pieces/*.svg (ikon)     -             Colin M.L. Burnett             GPL-2.0 atau lebih baru
+  pieces/merida/          Merida        Armando Hernandez Marroquin    GPL-2.0 atau lebih baru
+  pieces/chessnut/        Chessnut      Alexis Luengas                 Apache-2.0
+  pieces/fantasy/         Fantasi       Maurizio Monge                 MIT
+  pieces/celtic/          Celtic        Maurizio Monge                 MIT
+  pieces/spatial/         Spatial       Maurizio Monge                 MIT
+  pieces/rhosgfx/         Piksel        RhosGFX                        CC0 1.0 (domain publik)
+
+Teks lisensi:
+  GPL-2.0    : licenses/GPL-2.0.txt   (karena "atau lebih baru", juga boleh
+                                       di bawah licenses/GPL-3.0.txt)
+  Apache-2.0 : licenses/Apache-2.0-chessnut.txt
+               Sumber: https://github.com/LexLuengas/chessnut-pieces
+  MIT        : licenses/MIT-chess-art.txt
+               Sumber: https://github.com/maurimo/chess-art
+  CC0 1.0    : https://creativecommons.org/publicdomain/zero/1.0/
+               Sumber: https://rhosgfx.itch.io/
+
+Gambar bidak tidak diubah.
+
+
+3. RUMUS & REFERENSI
+--------------------
+- Rumus persentase menang dan akurasi langkah di fitur "Ulasan Permainan"
+  mengikuti rumus yang dipublikasikan Lichess (https://lichess.org/page/accuracy).
+- Tabel nilai posisi bidak pada mesin bawaan (js/ai.js) mengikuti
+  "Simplified Evaluation Function" karya Tomasz Michniewski
+  (https://www.chessprogramming.org/Simplified_Evaluation_Function).
+- Nama-nama pembukaan catur adalah istilah umum dunia catur.
+
+
+4. KODE GAME INI
+----------------
+Kode berikut dibuat khusus untuk game ini (bukan dari pihak ketiga):
+  index.html, css/style.css, js/core.js, js/ai.js, js/app.js, server.js,
+  Mulai Server.bat
+
+Copyright (C) 2026 [Nama Pembuat]
+Kode ini dilisensikan di bawah GNU General Public License versi 3
+(GPL-3.0). Teks lengkapnya ada di file LICENSE.
+
+Kamu boleh menjalankan, mempelajari, membagikan, dan mengubah kode ini.
+Jika kamu membagikan versi asli atau versi yang sudah diubah, kamu wajib:
+  - tetap memakai lisensi GPL-3.0,
+  - menyertakan kode sumbernya (atau tautan ke kode sumbernya),
+  - menyertakan file LICENSE, CREDITS.txt, dan folder licenses/.
+Kode ini diberikan TANPA JAMINAN APA PUN; lihat bagian 15-16 di LICENSE.
+
+Avatar bot digambar sendiri dengan SVG di dalam js/app.js. Nama bot memakai
+nama tokoh publik hanya sebagai hiburan; kalimat sapaannya karangan dan bukan
+kutipan asli tokoh tersebut.
+
+Tidak berafiliasi dengan chess.com, Lichess, atau proyek Stockfish.
