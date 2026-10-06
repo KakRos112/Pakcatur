@@ -658,7 +658,7 @@ select {
 .m-status { font-size: 13px; color: var(--muted); min-height: 18px; padding-left: 4px; }
 .m-status .dots::after { content: ""; animation: dots 1.2s steps(4) infinite; }
 
-.m-moves { align-items: center; width: 100%; padding: 6px 0; }
+.m-moves { align-items: center; gap: 6px; width: 100%; padding: 6px 0; }
 .m-strip {
   flex: 1;
   display: flex;
@@ -675,8 +675,18 @@ select {
 .m-mv.current { background: #4b4847; box-shadow: inset 0 -2px 0 #fff; }
 .m-mv .cls-icon { margin-right: 4px; }
 .m-empty { color: var(--muted); margin: 0 auto; font-size: 14px; }
-.m-arrow { background: none; border: 0; color: var(--muted); font-size: 34px; line-height: 1; padding: 0 14px; }
-.m-arrow:active { color: var(--text); }
+.m-arrow {
+  flex-shrink: 0;
+  width: 46px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 30px; font-weight: 700; line-height: 1;
+  padding: 0 0 4px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .35);
+}
+.m-arrow:active { background: var(--card-hover); transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, .35); }
 
 .m-toolbar {
   position: fixed;
