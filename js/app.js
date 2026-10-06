@@ -1673,6 +1673,42 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     return { title, reason: reasons[o.reason] || '' };
   }
 
+  // ---------- Video kartu hasil (skakmat) ----------
+  // Ganti nama file di sini kalau nanti ada video kalah tersendiri.
+  const RESULT_VIDEO = { win: 'media/skak.mp4', lose: 'media/skak.mp4' };
+  const resultVideo = $('resultVideo');
+
+  function playResultVideo(src) {
+    const v = resultVideo;
+    $('btnVideoSound').hidden = true;
+    if (!v.src.endsWith(src)) v.src = src;
+    v.currentTime = 0;
+    v.muted = !$('optSound').checked;
+    $('resultCard').classList.add('has-video');
+    v.play().catch(() => {
+      // Browser menolak memutar dengan suara: putar tanpa suara, sediakan tombol 🔇
+      if (v.muted) return;
+      v.muted = true;
+      v.play().catch(() => {});
+      $('btnVideoSound').hidden = false;
+    });
+  }
+  function stopResultVideo() {
+    resultVideo.pause();
+    $('resultCard').classList.remove('has-video');
+    $('btnVideoSound').hidden = true;
+  }
+  $('btnVideoSound').onclick = () => {
+    resultVideo.muted = false;
+    if (resultVideo.ended) resultVideo.currentTime = 0;
+    resultVideo.play().catch(() => {});
+    $('btnVideoSound').hidden = true;
+  };
+  resultVideo.onerror = stopResultVideo;
+  // Kartu hasil disembunyikan dari banyak tempat; hentikan videonya setiap kali kartu tertutup
+  new MutationObserver(() => { if ($('gameOver').hidden) stopResultVideo(); })
+    .observe($('gameOver'), { attributes: true, attributeFilter: ['hidden'] });
+
   function endGame(result, reason) {
     if (game.over) return;
     premove = null;
@@ -1691,13 +1727,15 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     $('resultMe').innerHTML = avatarSVG(meFirst ? PLAYER_LOOK : game.bot.look);
     $('resultBot').innerHTML = avatarSVG(meFirst ? game.bot.look : PLAYER_LOOK);
     $('gameOver').hidden = false;
+    let video = null;
     if (result === '1/2-1/2') { if (game.mode === 'bot') say(pick(LINES.draw)); setEval(0, 0); }
     else {
       const playerWon = (result === '1-0') === (game.player === W);
       if (game.mode === 'bot') say(pick(playerWon ? LINES.win : LINES.lose));
       setEval(result === '1-0' ? 30000 : -30000, 0);
+      if (reason === 'skakmat') video = RESULT_VIDEO[playerWon ? 'win' : 'lose'];
     }
-    sounds.end();
+    if (video) playResultVideo(video); else sounds.end();
     $('btnReviewSide').hidden = false;
     $('btnResign').hidden = true;
     $('btnRematch').textContent = game.mode === 'online' ? 'Ajak Main Lagi' : 'Main Lagi';

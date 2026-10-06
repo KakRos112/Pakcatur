@@ -20,7 +20,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const ROOT = __dirname;
 
 // Hanya file game ini yang boleh diunduh (bukan .git, server.js, skrip deploy, dll.)
-const PUBLIC_FILE = /^\/(?:index\.html|CREDITS\.txt|LICENSE|(?:css|js|engine|pieces|licenses)\/[\w.-]+(?:\/[\w.-]+)?)$/;
+const PUBLIC_FILE = /^\/(?:index\.html|CREDITS\.txt|LICENSE|(?:css|js|engine|pieces|licenses)\/[\w.-]+(?:\/[\w.-]+)?|media\/[\w.-]+\.(?:mp4|webm))$/;
 
 // Batas sederhana supaya server tidak mudah dibanjiri saat dibuka ke internet
 const MAX_ROOMS = 300;
@@ -35,7 +35,7 @@ const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
 };
 const CSP = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; "
-  + "img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+  + "img-src 'self' data:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 // Aturan catur yang sama dengan di browser, untuk memvalidasi setiap langkah
 vm.runInThisContext(fs.readFileSync(path.join(ROOT, 'js', 'core.js'), 'utf8'));
@@ -44,6 +44,7 @@ const C = CaturCore(); // eslint-disable-line no-undef
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4', '.webm': 'video/webm',
 };
 
 const DISCONNECT_LOSS_MS = 60000;   // pemain terputus selama ini saat bermain = kalah
@@ -488,6 +489,22 @@ const server = http.createServer(async (req, res) => {
     const ext = path.extname(file).toLowerCase();
     const headers = { ...SECURITY_HEADERS, 'Content-Type': MIME[ext] || 'text/plain; charset=utf-8', 'Content-Length': st.size, 'Cache-Control': 'no-cache' };
     if (ext === '.html') headers['Content-Security-Policy'] = CSP;
+    // Video: boleh di-cache dan diunduh sebagian (Range), wajib untuk Safari/iPhone
+    if (ext === '.mp4' || ext === '.webm') {
+      headers['Cache-Control'] = 'public, max-age=86400';
+      headers['Accept-Ranges'] = 'bytes';
+      const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      if (m && (m[1] || m[2])) {
+        const start = m[1] ? +m[1] : Math.max(0, st.size - +m[2]);
+        const end = m[1] && m[2] ? Math.min(+m[2], st.size - 1) : st.size - 1;
+        if (start > end || start >= st.size) {
+          res.writeHead(416, { ...SECURITY_HEADERS, 'Content-Range': `bytes */${st.size}` }); return res.end();
+        }
+        res.writeHead(206, { ...headers, 'Content-Length': end - start + 1, 'Content-Range': `bytes ${start}-${end}/${st.size}` });
+        if (req.method === 'HEAD') return res.end();
+        return fs.createReadStream(file, { start, end }).pipe(res);
+      }
+    }
     res.writeHead(200, headers);
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);

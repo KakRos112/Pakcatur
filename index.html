@@ -48,8 +48,10 @@
             <div class="cls-badge" id="clsBadge" hidden></div>
             <div class="promo" id="promo" hidden></div>
             <div class="overlay" id="gameOver" hidden>
-              <div class="result-card">
+              <div class="result-card" id="resultCard">
+                <video class="result-video" id="resultVideo" playsinline preload="none"></video>
                 <button class="close-x" id="btnCloseResult" title="Tutup">✕</button>
+                <button class="video-sound" id="btnVideoSound" title="Nyalakan suara video" hidden>🔇</button>
                 <div class="result-title" id="resultTitle">Kamu Menang!</div>
                 <div class="result-reason" id="resultReason">dengan skakmat</div>
                 <div class="result-avatars">
