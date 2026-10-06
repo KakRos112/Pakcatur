@@ -280,6 +280,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     thinking: false,
     clock: null,
     mode: 'bot',
+    time: '0',       // kontrol waktu permainan ini (untuk simpan otomatis)
   };
   let orientation = W;
   let selected = -1;
@@ -637,6 +638,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
 
     const st = pos.status();
     if (st.over) { endGame(st.result, st.reason); return; }
+    saveBotGame();
 
     if (game.mode === 'online') { /* tanpa komentar bot */ } else if (color === game.player) {
       if (flags & C.FLAG_CAP && Math.random() < 0.3) say(pick(LINES.lost));
@@ -712,8 +714,8 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     const [base, inc] = v.split('+').map(Number);
     return { base: base * 1000, inc: (inc || 0) * 1000 };
   }
-  function startClock() {
-    const tc = parseTime(settings.time);
+  function startClock(time = settings.time) {
+    const tc = parseTime(time);
     if (game.clock && game.clock.timer) clearInterval(game.clock.timer);
     if (!tc) { game.clock = null; $('topClock').hidden = $('bottomClock').hidden = true; return; }
     game.clock = { [W]: tc.base, [B]: tc.base, inc: tc.inc, last: Date.now(), running: false, timer: null };
@@ -1612,8 +1614,34 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   }
   $('evalBar').classList.toggle('off', !$('optEval').checked);
 
+  // ---------- Simpan otomatis permainan lawan bot (lanjut setelah reload) ----------
+  function saveBotGame() {
+    if (game.mode !== 'bot' || !game.active || game.over) return;
+    const c = game.clock;
+    store.set('botGame', {
+      bot: BOTS.indexOf(game.bot), player: game.player, time: game.time,
+      moves: game.history.map(h => h.uci),
+      clock: c ? { w: c[W], b: c[B], running: c.running } : null,
+    });
+  }
+  const clearBotGame = () => store.set('botGame', null);
+  window.addEventListener('pagehide', saveBotGame); // simpan sisa waktu terkini
+
+  function resumeBotGame() {
+    const s = store.get('botGame', null);
+    if (!s || !BOTS[s.bot] || !Array.isArray(s.moves) || (s.player !== W && s.player !== B)) return;
+    const pos = new C.Position();
+    for (const u of s.moves) {
+      const m = pos.moveFromUci(u);
+      if (!m) { clearBotGame(); return; }
+      pos.make(m);
+    }
+    if (pos.status().over) { clearBotGame(); return; }
+    newGame(s);
+  }
+
   // ---------- Alur permainan ----------
-  function newGame() {
+  function newGame(saved) {
     if (game.mode === 'online') { olApi('leave'); }
     game.mode = 'bot';
     hideOffer();
@@ -1625,8 +1653,9 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     game.token++;
     evalToken++;
     if (engines.sfBot) { engines.sfBot.cancel(); engines.sfBot.newGame(); }
-    game.bot = BOTS[settings.bot];
-    game.player = settings.color === 'w' ? W : settings.color === 'b' ? B : (Math.random() < 0.5 ? W : B);
+    game.bot = saved ? BOTS[saved.bot] : BOTS[settings.bot];
+    game.player = saved ? saved.player : settings.color === 'w' ? W : settings.color === 'b' ? B : (Math.random() < 0.5 ? W : B);
+    game.time = saved ? String(saved.time || '0') : settings.time;
     game.pos = new C.Position();
     game.startFen = C.START_FEN;
     game.history = [];
@@ -1646,16 +1675,33 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     $('chatAvatar').innerHTML = avatarSVG(game.bot.look);
     $('mChatAvatar').innerHTML = avatarSVG(game.bot.look);
     $('mBubbles').innerHTML = '';
-    say(game.bot.quote);
     buildSquares();
-    startClock();
+    startClock(game.time);
+    if (saved) {
+      for (const u of saved.moves) {
+        const pos = game.pos, m = pos.moveFromUci(u);
+        const san = pos.san(m, pos.legalMoves()), color = pos.turn;
+        pos.make(m);
+        game.history.push({ m, uci: u, san, from: mFrom(m), to: mTo(m), color });
+        game.fens.push(pos.fen());
+      }
+      const c = game.clock;
+      if (c && saved.clock) { c[W] = saved.clock.w; c[B] = saved.clock.b; c.running = saved.clock.running; c.last = Date.now(); }
+      say('Ayo lanjutkan permainan kita!');
+    } else {
+      say(game.bot.quote);
+      sounds.start();
+    }
     renderPlayers();
     render();
     renderMoveList();
+    renderCaptured();
+    renderClocks();
     setEval(20, 0);
     updateStatus();
-    sounds.start();
-    if (game.player === B) botMove();
+    saveBotGame();
+    if (saved) runAnalysis();
+    if (game.pos.turn !== game.player) botMove();
   }
 
   function resultText() {
@@ -1711,6 +1757,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
 
   function endGame(result, reason) {
     if (game.over) return;
+    if (game.mode === 'bot') clearBotGame();
     premove = null;
     game.over = { result, reason };
     game.thinking = false;
@@ -1744,6 +1791,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
 
   function backToSetup() {
     if (game.mode === 'online') { olApi('leave'); online.room = null; }
+    else clearBotGame();
     game.mode = 'bot';
     hideOffer();
     resetReview();
@@ -1800,6 +1848,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     renderCaptured();
     updateStatus();
     runAnalysis();
+    saveBotGame();
     say('Oke, silakan coba langkah lain.');
   }
 
@@ -1849,7 +1898,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   }
 
   // ---------- Tombol ----------
-  $('btnPlay').onclick = newGame;
+  $('btnPlay').onclick = () => newGame();
   $('btnRematch').onclick = () => rematchGame();
   $('btnNewBot').onclick = backToSetup;
   $('btnNew').onclick = () => {
@@ -2294,6 +2343,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   }
 
   function startOnlineGame(v) {
+    clearBotGame();
     const opp = v.you === 'w' ? v.black : v.white;
     resetReview();
     closeSheet();
@@ -2528,5 +2578,6 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   showTab(setupTab);
   updateStatus();
   initStockfish();
+  resumeBotGame();
   initOnline();
 })();
