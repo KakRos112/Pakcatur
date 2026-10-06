@@ -479,6 +479,10 @@ select {
 .progress div { height: 100%; width: 0; background: var(--green); transition: width .3s; }
 
 .coach { display: flex; gap: 10px; align-items: flex-start; background: #fff; color: #2b2a28; border-radius: 8px; padding: 10px 12px; min-height: 64px; }
+/* Saat mengulas, tinggi kotak penjelasan dan tempat tombol dibuat tetap supaya papan & grafik tidak loncat */
+#reviewContent .coach { height: 172px; }
+#reviewContent .coach-text { flex: 1; min-width: 0; max-height: 100%; overflow-y: auto; }
+#coachActions[hidden] { display: flex; visibility: hidden; }
 .coach-icon {
   flex-shrink: 0;
   width: 30px; height: 30px;
