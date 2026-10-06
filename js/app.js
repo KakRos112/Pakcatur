@@ -1773,6 +1773,8 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     const meFirst = game.player === W;
     $('resultMe').innerHTML = avatarSVG(meFirst ? PLAYER_LOOK : game.bot.look);
     $('resultBot').innerHTML = avatarSVG(meFirst ? game.bot.look : PLAYER_LOOK);
+    $('resultMeName').textContent = meFirst ? 'Kamu' : game.bot.name;
+    $('resultBotName').textContent = meFirst ? game.bot.name : 'Kamu';
     $('gameOver').hidden = false;
     let video = null;
     if (result === '1/2-1/2') { if (game.mode === 'bot') say(pick(LINES.draw)); setEval(0, 0); }

@@ -20,7 +20,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Pakcatur: ikon kuda catur dan tulisan Main catur gratis di browser">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <main class="app">
@@ -70,9 +70,9 @@
                 <div class="result-title" id="resultTitle">Kamu Menang!</div>
                 <div class="result-reason" id="resultReason">dengan skakmat</div>
                 <div class="result-avatars">
-                  <div class="avatar big" id="resultMe"></div>
+                  <div class="result-player"><div class="avatar big" id="resultMe"></div><div class="result-name" id="resultMeName"></div></div>
                   <span class="vs" id="resultScore">1-0</span>
-                  <div class="avatar big" id="resultBot"></div>
+                  <div class="result-player"><div class="avatar big" id="resultBot"></div><div class="result-name" id="resultBotName"></div></div>
                 </div>
                 <button class="btn green" id="btnGameReview" data-tip="Analisis semua langkah: akurasi, blunder &amp; langkah terbaik" data-key="G">⭐ Ulasan Permainan</button>
                 <div class="btn-row">
@@ -309,9 +309,9 @@ node server.js</pre>
     </div>
   </div>
 
-  <script src="js/core.js?v=6"></script>
-  <script src="js/ai.js?v=6"></script>
-  <script src="engine/stockfish-src.js?v=6" defer></script>
-  <script src="js/app.js?v=6" defer></script>
+  <script src="js/core.js?v=7"></script>
+  <script src="js/ai.js?v=7"></script>
+  <script src="engine/stockfish-src.js?v=7" defer></script>
+  <script src="js/app.js?v=7" defer></script>
 </body>
 </html>
