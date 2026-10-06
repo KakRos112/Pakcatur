@@ -1720,8 +1720,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   }
 
   // ---------- Video kartu hasil (menang/kalah) ----------
-  // Ganti nama file di sini kalau nanti ada video kalah tersendiri.
-  const RESULT_VIDEO = { win: 'media/skak.mp4', lose: 'media/skak.mp4' };
+  const RESULT_VIDEO = { win: 'media/skak.mp4', lose: 'media/kalah.mp4' };
   const resultVideo = $('resultVideo');
 
   function playResultVideo(src) {
