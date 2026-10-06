@@ -1719,8 +1719,8 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     return { title, reason: reasons[o.reason] || '' };
   }
 
-  // ---------- Video kartu hasil (menang/kalah) ----------
-  const RESULT_VIDEO = { win: 'media/skak.mp4', lose: 'media/kalah.mp4' };
+  // ---------- Video kartu hasil (menang/kalah/seri) ----------
+  const RESULT_VIDEO = { win: 'media/skak.mp4', lose: 'media/kalah.mp4', draw: 'media/seri.mp4' };
   const resultVideo = $('resultVideo');
 
   function playResultVideo(src) {
@@ -1775,7 +1775,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     $('resultMeName').textContent = meFirst ? 'Kamu' : game.bot.name;
     $('resultBotName').textContent = meFirst ? game.bot.name : 'Kamu';
     $('gameOver').hidden = false;
-    let video = null;
+    let video = RESULT_VIDEO.draw;
     if (result === '1/2-1/2') { if (game.mode === 'bot') say(pick(LINES.draw)); setEval(0, 0); }
     else {
       const playerWon = (result === '1-0') === (game.player === W);
