@@ -20,7 +20,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Pakcatur: ikon kuda catur dan tulisan Main catur gratis di browser">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
   <main class="app">
@@ -106,11 +106,12 @@
       <header class="panel-head">
         <img src="pieces/wN.svg" alt="" width="26" height="26">
         <h1 id="panelTitle">Lawan Bot</h1>
-        <a class="about-btn" id="btnAbout" href="about.html" target="_blank" rel="noopener" data-tip="Tentang game: mesin, pengembang &amp; sumber" data-key="I" aria-label="Tentang Pakcatur">i</a>
+        <a class="about-btn" id="btnAbout" href="about.html" target="_blank" rel="noopener" data-tip="Tentang game: mesin, pengembang &amp; sumber" data-key="I" aria-label="Tentang Pakcatur"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 8h2.4v7.5h-2.4zM12 5.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8z"/></svg></a>
       </header>
       <div class="mode-tabs" id="modeTabs">
-        <button data-tab="bot" class="active">🤖 Lawan Bot</button>
-        <button data-tab="online">🌐 Online (LAN)</button>
+        <button data-tab="bot" class="active"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M11 2h2v3h4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h4zM9 9.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM9 15h6v1.5H9zM1 10h2v5H1zm20 0h2v5h-2z"/></svg>Lawan Bot</button>
+        <button data-tab="online"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><mask id="icoGlobe"><circle cx="12" cy="12" r="10" fill="#fff"/><g fill="none" stroke="#000" stroke-width="1.6"><ellipse cx="12" cy="12" rx="4" ry="9.2"/><path d="M2 12h20M3.5 7.5h17M3.5 16.5h17"/></g></mask><circle cx="12" cy="12" r="10" mask="url(#icoGlobe)"/></svg>Online</button>
+        <button data-tab="tour"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M6 3h12v2h3v3a4.5 4.5 0 0 1-4.4 4.5 5 5 0 0 1-3.6 3.4V18h3a1 1 0 0 1 1 1v2H7v-2a1 1 0 0 1 1-1h3v-2.1a5 5 0 0 1-3.6-3.4A4.5 4.5 0 0 1 3 8V5h3zM5 7v1a2.5 2.5 0 0 0 1.4 2.2A5 5 0 0 1 6 8.5V7zm13 0v1.5q0 .9-.4 1.7A2.5 2.5 0 0 0 19 8V7z"/></svg>Turnamen</button>
       </div>
 
       <!-- Tahap pilih bot -->
@@ -146,7 +147,8 @@
           <label class="check"><input type="checkbox" id="optHints" checked> Tampilkan langkah yang sah</label>
           <label class="check"><input type="checkbox" id="optEval" checked> Tampilkan bar evaluasi</label>
           <label class="check"><input type="checkbox" id="optSound" checked> Suara</label>
-          <button class="btn wide" id="btnTheme" data-tip="Ganti tema papan &amp; set bidak" data-key="T">🎨 Tema Papan &amp; Bidak</button>
+          <label class="check"><input type="checkbox" id="optNoHint"> Matikan petunjuk</label>
+          <button class="btn wide" id="btnTheme" data-tip="Ganti tema papan &amp; set bidak" data-key="T"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2a10 10 0 0 0 0 20 2 2 0 0 0 1.5-3.3 2 2 0 0 1 1.5-3.3h2.4a4.6 4.6 0 0 0 4.6-4.6C22 5.9 17.5 2 12 2zM6.5 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm3-4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm3 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>Tema Papan &amp; Bidak</button>
         </div>
       </div>
 
@@ -193,6 +195,42 @@ node server.js</pre>
 
           <div class="ol-head">Lobi Tersedia <span id="olCount"></span></div>
           <div id="olList"></div>
+        </div>
+      </div>
+
+      <!-- Turnamen sistem gugur -->
+      <div class="panel-body" id="tourView" hidden>
+        <div id="tvOffline" class="ol-offline">
+          <b>Turnamen butuh server.</b>
+          <p>Buka game lewat alamat server (misalnya <code>https://pakcatur.my.id</code>), bukan langsung dari file.</p>
+        </div>
+        <div id="tvMain" hidden>
+          <div id="tvListPage">
+            <div class="opt-label">Nama kamu</div>
+            <input class="text-input" id="tvName" maxlength="20" autocomplete="off">
+            <div class="ol-head">Buat Turnamen</div>
+            <input class="text-input" id="tvTourName" maxlength="20" placeholder="Nama turnamen (opsional)" autocomplete="off">
+            <div class="opt-label">Waktu tiap permainan</div>
+            <select id="tvTime">
+              <option value="180+2">3 menit | +2 detik</option>
+              <option value="300+0">5 menit</option>
+              <option value="600+0">10 menit</option>
+              <option value="900+10">15 menit | +10 detik</option>
+            </select>
+            <button class="btn green wide" id="tvCreate">Buat Turnamen</button>
+            <div class="ol-head">Daftar Turnamen</div>
+            <div id="tvList"></div>
+            <p class="tv-note">Sistem gugur: yang kalah tersingkir, pemenang maju sampai final. Kalau seri, main ulang dengan warna ditukar. Setelah 3× seri, pemenang diundi.</p>
+          </div>
+          <div id="tvDetail" hidden>
+            <button class="btn tv-back" id="tvBack">← Semua turnamen</button>
+            <div class="tv-title" id="tvTitle"></div>
+            <div class="tv-sub" id="tvSub"></div>
+            <div class="tv-banner" id="tvBanner"></div>
+            <div class="btn-row" id="tvActions"></div>
+            <div id="tvPlayers"></div>
+            <div class="tv-bracket" id="tvBracket"></div>
+          </div>
         </div>
       </div>
 
@@ -300,6 +338,14 @@ node server.js</pre>
     </div>
   </div>
 
+  <div class="modal" id="hintOffModal" hidden>
+    <div class="modal-card small-card" role="alertdialog" aria-labelledby="hintOffTitle">
+      <h2 id="hintOffTitle">Petunjuk dimatikan</h2>
+      <p>Kamu memilih bermain tanpa petunjuk. Untuk mengaktifkannya lagi, keluar dari permainan, lalu hapus centang <b>Matikan petunjuk</b> di menu Lawan Bot.</p>
+      <button class="btn green wide" id="hintOffOk">Mengerti</button>
+    </div>
+  </div>
+
   <div class="modal" id="settingsModal" hidden>
     <div class="modal-card" role="dialog" aria-label="Tema papan dan bidak">
       <button class="close-x" id="btnCloseSettings" title="Tutup">✕</button>
@@ -314,9 +360,9 @@ node server.js</pre>
     </div>
   </div>
 
-  <script src="js/core.js?v=13"></script>
-  <script src="js/ai.js?v=13"></script>
-  <script src="engine/stockfish-src.js?v=13" defer></script>
-  <script src="js/app.js?v=13" defer></script>
+  <script src="js/core.js?v=15"></script>
+  <script src="js/ai.js?v=15"></script>
+  <script src="engine/stockfish-src.js?v=15" defer></script>
+  <script src="js/app.js?v=15" defer></script>
 </body>
 </html>

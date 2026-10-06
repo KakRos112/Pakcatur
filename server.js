@@ -1,5 +1,6 @@
 // Server game catur: menyajikan file game + lobi & sinkronisasi langkah antar pemain.
 // Jalankan:  node server.js   lalu buka http://<ip-komputer>:3000 dari perangkat di jaringan yang sama.
+// Turnamen disimpan di data/turnamen.json (atau di STATE_DIRECTORY / DATA_DIR jika diisi).
 // Tidak butuh paket tambahan: komunikasi memakai Server-Sent Events (server -> pemain) dan POST (pemain -> server).
 //
 // Variabel lingkungan (opsional):
@@ -51,8 +52,21 @@ const DISCONNECT_LOSS_MS = 60000;   // pemain terputus selama ini saat bermain =
 const WAITING_GRACE_MS = 20000;     // lobi dihapus jika pembuatnya terputus selama ini
 const OVER_ROOM_TTL_MS = 10 * 60000;
 
+// Turnamen sistem gugur
+const MAX_TOURS = 50;
+const TOUR_MAX_PLAYERS = 32;
+const TOUR_NEXT_DELAY_MS = 10000;      // jeda sebelum pertandingan turnamen berikutnya dimulai
+const TOUR_FIRST_MOVE_MS = 60000;      // putih yang tidak melangkah selama ini = kalah
+const TOUR_MAX_DRAWS = 3;              // setelah seri sebanyak ini, pemenang diundi
+const TOUR_DONE_TTL_MS = 2 * 3600000;  // turnamen yang selesai ditampilkan selama 2 jam
+// Turnamen disimpan ke file supaya tetap ada setelah server di-restart.
+// systemd (StateDirectory=pakcatur) mengisi STATE_DIRECTORY=/var/lib/pakcatur.
+const DATA_DIR = process.env.STATE_DIRECTORY || process.env.DATA_DIR || path.join(ROOT, 'data');
+const TOUR_FILE = path.join(DATA_DIR, 'turnamen.json');
+
 const clients = new Map(); // token -> { name, streams: Set<res>, lastSeen }
 const rooms = new Map();   // id -> room
+const tours = new Map();   // id -> turnamen
 
 // ---------- Utilitas ----------
 const now = () => Date.now();
@@ -83,6 +97,14 @@ function timeLabel(t) {
   if (!t) return 'Tanpa batas waktu';
   const m = t.base / 60000;
   return t.inc ? `${m} menit | +${t.inc / 1000} detik` : `${m} menit`;
+}
+
+function parseTime(time) {
+  const tc = String(time || '0');
+  if (tc === '0') return null;
+  const [base, inc] = tc.split('+').map(Number);
+  if (!(base > 0 && base <= 3600) || !(inc >= 0 && inc <= 60)) throw new Error('Waktu tidak valid');
+  return { base: base * 1000, inc: (inc || 0) * 1000 };
 }
 
 // ---------- Lobi ----------
@@ -127,11 +149,13 @@ function roomView(room, token) {
     result: g.result, reason: g.reason,
     drawOffer: g.drawOffer, rematch: g.rematch, oppLeft: !!room.left?.[opp],
     chat: room.chat.slice(-30),
+    tour: room.tour ? { id: room.tour.id, label: room.name, round: tours.has(room.tour.id) ? roundLabel(tours.get(room.tour.id), room.tour.r) : '' } : null,
   };
 }
 
 function pushRoom(room) {
   for (const t of [room.host, room.guest]) if (t) toToken(t, 'room', roomView(room, t));
+  if (room.tour) saveSoon();
 }
 
 function startGame(room) {
@@ -147,9 +171,10 @@ function startGame(room) {
   room.white = white; room.black = black;
   room.gameNo++;
   room.status = 'playing';
+  room.startedAt = now();
   room.left = {};
   room.game = {
-    pos: new C.Position(), moves: [], result: null, reason: null, drawOffer: null, rematch: { w: false, b: false },
+    pos: new C.Position(), moves: [], result: null, reason: null, drawOffer: null, rematch: { w: false, b: false }, lastMoveAt: now(),
     clock: room.time ? { w: room.time.base, b: room.time.base, inc: room.time.inc, running: false, last: 0 } : null,
   };
   systemChat(room, `Permainan #${room.gameNo} dimulai. Putih: ${clients.get(white)?.name}, Hitam: ${clients.get(black)?.name}.`);
@@ -166,6 +191,7 @@ function finish(room, result, reason) {
   g.result = result; g.reason = reason; g.drawOffer = null;
   room.status = 'over';
   room.overAt = now();
+  if (room.tour) tourGameOver(room);
 }
 
 function systemChat(room, text) {
@@ -205,10 +231,239 @@ function onlyKing(pos, side) {
   return true;
 }
 
+// ---------- Turnamen (sistem gugur) ----------
+// Setiap pertandingan dimainkan di ruang biasa yang ditandai room.tour, jadi jam, chat, seri & menyerah
+// memakai aturan yang sama. Seri = main ulang dengan warna ditukar; setelah TOUR_MAX_DRAWS kali seri, diundi.
+const tourName = (t, token) => t.names[token] || '?';
+const isActiveTour = t => t.status === 'open' || t.status === 'running';
+
+function roundLabel(t, r) {
+  const left = t.rounds.length - r;
+  return left === 1 ? 'Final' : left === 2 ? 'Semifinal' : left === 3 ? 'Perempat final' : `Babak ${r + 1}`;
+}
+
+function eliminated(t, token) {
+  return !!t.quit[token] || t.rounds.some(r => r.some(m => m.winner && m.winner !== token && (m.a === token || m.b === token)));
+}
+
+// Turnamen yang masih diikuti pemain ini (belum tersingkir)
+function activeTourOf(token) {
+  for (const t of tours.values()) if (isActiveTour(t) && t.players.includes(token) && !eliminated(t, token)) return t;
+  return null;
+}
+
+function tourView(t, token) {
+  const pv = tok => tok ? { name: tourName(t, tok), me: tok === token } : null;
+  return {
+    id: t.id, name: t.name, host: tourName(t, t.host), mine: t.host === token, status: t.status,
+    time: timeLabel(t.time), created: t.created, max: TOUR_MAX_PLAYERS,
+    joined: t.players.includes(token), out: t.players.includes(token) && eliminated(t, token),
+    players: t.players.map(pv),
+    rounds: t.rounds.map((r, ri) => ({
+      label: roundLabel(t, ri),
+      matches: r.map(m => {
+        const room = m.roomId && rooms.get(m.roomId);
+        return {
+          a: pv(m.a), b: pv(m.b), bye: !!m.bye, winner: m.winner ? (m.winner === m.a ? 'a' : 'b') : null,
+          draws: m.games.filter(g => g.result === '1/2-1/2').length, coin: !!m.coin, forfeit: !!m.forfeit,
+          live: !!(room && room.status === 'playing'), startIn: m.startAt ? Math.max(0, m.startAt - now()) : null,
+        };
+      }),
+    })),
+    champion: t.champion ? pv(t.champion) : null,
+  };
+}
+
+function broadcastTours() {
+  const list = [...tours.values()].sort((x, y) => (isActiveTour(y) - isActiveTour(x)) || y.created - x.created);
+  for (const [token, c] of clients) {
+    if (!c.streams.size) continue;
+    const data = { tours: list.map(t => tourView(t, token)) };
+    for (const res of c.streams) sse(res, 'tours', data);
+  }
+  saveSoon();
+}
+function pushToursTo(res, token) {
+  const list = [...tours.values()].sort((x, y) => (isActiveTour(y) - isActiveTour(x)) || y.created - x.created);
+  sse(res, 'tours', { tours: list.map(t => tourView(t, token)) });
+}
+
+function makeBracket(t) {
+  const p = [...t.players];
+  for (let i = p.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [p[i], p[j]] = [p[j], p[i]]; }
+  let size = 2;
+  while (size < p.length) size *= 2;
+  const byes = size - p.length;
+  const first = [];
+  let k = 0;
+  for (let i = 0; i < size / 2; i++) {
+    const a = p[k++], b = i < byes ? null : p[k++];
+    first.push(newMatch(a, b, i < byes));
+  }
+  t.rounds = [first];
+  for (let n = size / 4; n >= 1; n /= 2) t.rounds.push(Array.from({ length: n }, () => newMatch(null, null, false)));
+}
+function newMatch(a, b, bye) {
+  return { a: a || null, b: b || null, bye, winner: bye ? a : null, games: [], roomId: null, startAt: null };
+}
+
+// Teruskan pemenang ke babak berikutnya & jadwalkan pertandingan yang pemainnya sudah lengkap
+function advance(t) {
+  for (let r = 0; r < t.rounds.length; r++) {
+    t.rounds[r].forEach((m, i) => {
+      if (r > 0) {
+        const fa = t.rounds[r - 1][2 * i], fb = t.rounds[r - 1][2 * i + 1];
+        if (!m.a && fa.winner) m.a = fa.winner;
+        if (!m.b && fb.winner) m.b = fb.winner;
+      }
+      if (m.winner || !m.a || !m.b) return;
+      if (t.quit[m.a] || t.quit[m.b]) { m.winner = t.quit[m.a] ? m.b : m.a; m.forfeit = true; m.startAt = null; return; }
+      if (!m.roomId && !m.startAt) m.startAt = now() + (r === 0 ? 3000 : TOUR_NEXT_DELAY_MS);
+    });
+  }
+  const final = t.rounds[t.rounds.length - 1][0];
+  if (t.status === 'running' && final.winner) {
+    t.status = 'done'; t.champion = final.winner; t.doneAt = now();
+  }
+}
+
+// Keluarkan pemain dari ruang lain sebelum pertandingan turnamennya dimulai
+function detach(token) {
+  for (let room = roomOf(token); room; room = roomOf(token)) {
+    if (room.status !== 'over') { leaveRoom(token); continue; }
+    if (room.host === token) room.host = null;
+    if (room.guest === token) room.guest = null;
+    const color = colorOf(room, token);
+    if (color) { room.left = room.left || {}; room.left[color] = true; }
+    if (!room.host && !room.guest) rooms.delete(room.id); else pushRoom(room);
+  }
+}
+
+function startMatch(t, r, i) {
+  const m = t.rounds[r][i];
+  for (const tok of [m.a, m.b]) { client(tok, tourName(t, tok)); detach(tok); }
+  const prev = m.games[m.games.length - 1];
+  const id = crypto.randomBytes(3).toString('hex');
+  const room = {
+    id, name: `${t.name} · ${roundLabel(t, r)}`, host: m.a, guest: m.b,
+    hostColor: prev ? (prev.w === m.a ? 'b' : 'w') : 'r', time: t.time,
+    status: 'waiting', gameNo: 0, chat: [], created: now(), tour: { id: t.id, r, i },
+  };
+  rooms.set(id, room);
+  m.roomId = id; m.startAt = null;
+  startGame(room);
+  if (prev) systemChat(room, `Main ulang ke-${m.games.length} setelah seri, warna ditukar.`);
+  pushRoom(room);
+}
+
+function tourGameOver(room) {
+  const t = tours.get(room.tour.id);
+  const m = t && t.rounds[room.tour.r]?.[room.tour.i];
+  if (!m || m.roomId !== room.id) return;
+  const g = room.game;
+  m.games.push({ w: room.white, b: room.black, result: g.result });
+  m.roomId = null;
+  if (g.result === '1/2-1/2') {
+    if (m.games.length >= TOUR_MAX_DRAWS) {
+      m.winner = crypto.randomInt(2) ? m.a : m.b; m.coin = true;
+      systemChat(room, `Sudah ${m.games.length}× seri. Hasil undian: ${tourName(t, m.winner)} lolos.`);
+    } else {
+      m.startAt = now() + TOUR_NEXT_DELAY_MS;
+      systemChat(room, `Seri. Pertandingan diulang dengan warna ditukar dalam ${TOUR_NEXT_DELAY_MS / 1000} detik.`);
+    }
+  } else {
+    m.winner = g.result === '1-0' ? room.white : room.black;
+    const final = room.tour.r === t.rounds.length - 1;
+    systemChat(room, final ? `🏆 ${tourName(t, m.winner)} juara turnamen ${t.name}!` : `${tourName(t, m.winner)} lolos ke ${roundLabel(t, room.tour.r + 1)}.`);
+  }
+  advance(t);
+  setImmediate(broadcastTours); // setelah pemanggil finish() selesai mengirim hasil permainan
+}
+
+function tourTick() {
+  const t0 = now();
+  let changed = false;
+  for (const t of tours.values()) {
+    if (t.status === 'running') {
+      t.rounds.forEach((r, ri) => r.forEach((m, i) => {
+        if (m.startAt && !m.roomId && !m.winner && t0 >= m.startAt) { startMatch(t, ri, i); changed = true; }
+      }));
+    } else if (t.status === 'done' && t0 - t.doneAt > TOUR_DONE_TTL_MS) {
+      tours.delete(t.id); changed = true;
+    }
+  }
+  if (changed) broadcastTours();
+}
+
+// ---------- Simpan & muat turnamen ----------
+let saveTimer = null;
+function saveSoon() {
+  if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; saveTours(false); }, 1000);
+}
+function snapshot() {
+  const tourRooms = [...rooms.values()].filter(r => r.tour && r.status === 'playing').map(r => {
+    const g = r.game, c = clockView(g);
+    return {
+      id: r.id, name: r.name, host: r.host, guest: r.guest, white: r.white, black: r.black, hostColor: r.hostColor,
+      time: r.time, gameNo: r.gameNo, chat: r.chat, created: r.created, tour: r.tour,
+      game: { moves: g.moves, drawOffer: g.drawOffer, clock: c && { w: c.w, b: c.b, inc: c.inc, running: c.running } },
+    };
+  });
+  return JSON.stringify({ v: 1, savedAt: now(), tours: [...tours.values()], rooms: tourRooms });
+}
+function saveTours(sync) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const tmp = TOUR_FILE + '.tmp';
+    fs.writeFileSync(tmp, snapshot(), { mode: 0o600 });
+    fs.renameSync(tmp, TOUR_FILE);
+  } catch (e) {
+    if (!sync) console.error('Gagal menyimpan turnamen:', e.message);
+  }
+}
+function loadTours() {
+  let data;
+  try { data = JSON.parse(fs.readFileSync(TOUR_FILE, 'utf8')); } catch (e) {
+    if (e.code !== 'ENOENT') console.error('Gagal membaca turnamen:', e.message);
+    return;
+  }
+  for (const t of data.tours || []) {
+    tours.set(t.id, t);
+    for (const tok of t.players) client(tok, t.names[tok]);
+  }
+  for (const s of data.rooms || []) {
+    const pos = new C.Position();
+    for (const u of s.game.moves) { const m = pos.moveFromUci(u); if (m) pos.make(m); }
+    const c = s.game.clock;
+    rooms.set(s.id, {
+      ...s, status: 'playing', startedAt: now(), left: {},
+      game: {
+        pos, moves: s.game.moves, result: null, reason: null, drawOffer: s.game.drawOffer, rematch: { w: false, b: false }, lastMoveAt: now(),
+        // Waktu selama server mati tidak dihitung
+        clock: c ? { w: c.w, b: c.b, inc: c.inc, running: c.running, last: now() } : null,
+      },
+    });
+  }
+  // Pertandingan yang ruangnya tidak tersimpan: jadwalkan ulang
+  for (const t of tours.values()) {
+    if (t.status !== 'running') continue;
+    for (const r of t.rounds) for (const m of r) {
+      if (m.roomId && !rooms.has(m.roomId)) { m.roomId = null; if (!m.winner) m.startAt = now() + TOUR_NEXT_DELAY_MS; }
+    }
+    advance(t);
+  }
+  if (tours.size) console.log(`${tours.size} turnamen dimuat dari ${TOUR_FILE}`);
+}
+
 // ---------- API ----------
 const handlers = {
   hello({ token, name }) {
-    client(token, name);
+    const c = client(token, name);
+    let renamed = false;
+    for (const t of tours.values()) {
+      if (isActiveTour(t) && t.players.includes(token) && t.names[token] !== c.name) { t.names[token] = c.name; renamed = true; }
+    }
+    if (renamed) broadcastTours();
     const room = roomOf(token);
     if (room) pushRoom(room);
     return { ok: true };
@@ -216,15 +471,10 @@ const handlers = {
 
   create({ token, name, color, time, roomName }) {
     const c = client(token, name);
+    if (activeTourOf(token)) throw new Error('Kamu sedang ikut turnamen');
     leaveRoom(token);
     if (rooms.size >= MAX_ROOMS) throw new Error('Server sedang penuh, coba lagi nanti');
-    const tc = String(time || '0');
-    let t = null;
-    if (tc !== '0') {
-      const [base, inc] = tc.split('+').map(Number);
-      if (!(base > 0 && base <= 3600) || !(inc >= 0 && inc <= 60)) throw new Error('Waktu tidak valid');
-      t = { base: base * 1000, inc: (inc || 0) * 1000 };
-    }
+    const t = parseTime(time);
     const id = crypto.randomBytes(3).toString('hex');
     const room = {
       id, name: cleanName(roomName, `Lobi ${c.name}`), host: token, guest: null,
@@ -242,6 +492,7 @@ const handlers = {
     const room = rooms.get(roomId);
     if (!room || room.status !== 'waiting') throw new Error('Lobi sudah tidak tersedia');
     if (room.host === token) throw new Error('Ini lobi milikmu sendiri');
+    if (activeTourOf(token)) throw new Error('Kamu sedang ikut turnamen');
     leaveRoom(token);
     room.guest = token;
     startGame(room);
@@ -250,7 +501,9 @@ const handlers = {
     return { ok: true };
   },
 
-  leave({ token }) {
+  leave({ token, roomId }) {
+    // roomId: hanya keluar jika masih di ruang yang dimaksud (bukan pertandingan turnamen yang baru dimulai)
+    if (roomId && roomOf(token)?.id !== roomId) return { ok: true };
     leaveRoom(token);
     return { ok: true };
   },
@@ -273,6 +526,7 @@ const handlers = {
     }
     g.pos.make(m);
     g.moves.push(String(uci));
+    g.lastMoveAt = now();
     if (g.drawOffer && g.drawOffer !== color) g.drawOffer = null; // melangkah = menolak tawaran seri
     const st = g.pos.status();
     if (st.over) finish(room, st.result, st.reason);
@@ -312,6 +566,7 @@ const handlers = {
   rematch({ token, action }) {
     const room = roomOf(token);
     if (!room || room.status !== 'over') throw new Error('Permainan belum selesai');
+    if (room.tour) throw new Error('Di turnamen tidak ada main lagi');
     const g = room.game, color = colorOf(room, token), opp = color === 'w' ? 'b' : 'w', name = clients.get(token)?.name;
     if (room.left?.[opp] || !room.host || !room.guest) throw new Error('Lawan sudah keluar');
     if (action === 'decline') {
@@ -335,6 +590,74 @@ const handlers = {
     room.chat.push({ from: colorOf(room, token), name: clients.get(token)?.name, text: msg, t: now() });
     if (room.chat.length > 100) room.chat.splice(0, room.chat.length - 100);
     pushRoom(room);
+    return { ok: true };
+  },
+
+  tourCreate({ token, name, tourName: tn, time }) {
+    const c = client(token, name);
+    if (activeTourOf(token)) throw new Error('Kamu sudah ikut turnamen lain');
+    if (tours.size >= MAX_TOURS) throw new Error('Terlalu banyak turnamen, coba lagi nanti');
+    const tm = parseTime(time);
+    if (!tm) throw new Error('Turnamen harus memakai batas waktu');
+    const id = crypto.randomBytes(4).toString('hex');
+    tours.set(id, {
+      id, name: cleanName(tn, `Turnamen ${c.name}`), host: token, time: tm, status: 'open', created: now(),
+      players: [token], names: { [token]: c.name }, quit: {}, rounds: [], champion: null, doneAt: null,
+    });
+    broadcastTours();
+    return { ok: true, id };
+  },
+
+  tourJoin({ token, name, tourId }) {
+    const c = client(token, name);
+    const t = tours.get(String(tourId));
+    if (!t || t.status !== 'open') throw new Error('Pendaftaran turnamen sudah ditutup');
+    if (t.players.includes(token)) return { ok: true };
+    if (activeTourOf(token)) throw new Error('Kamu sudah ikut turnamen lain');
+    if (t.players.length >= TOUR_MAX_PLAYERS) throw new Error('Turnamen sudah penuh');
+    t.players.push(token);
+    t.names[token] = c.name;
+    broadcastTours();
+    return { ok: true };
+  },
+
+  tourLeave({ token, tourId }) {
+    const t = tours.get(String(tourId));
+    if (!t || !t.players.includes(token)) throw new Error('Kamu tidak ikut turnamen ini');
+    if (t.status === 'open') {
+      t.players = t.players.filter(x => x !== token);
+      delete t.names[token];
+      if (!t.players.length) tours.delete(t.id);
+      else if (t.host === token) t.host = t.players[0];
+    } else if (t.status === 'running' && !eliminated(t, token)) {
+      t.quit[token] = true;
+      const room = roomOf(token);
+      if (room && room.tour?.id === t.id && room.status === 'playing') leaveRoom(token); // dianggap kalah
+      advance(t);
+    }
+    broadcastTours();
+    return { ok: true };
+  },
+
+  tourStart({ token, tourId }) {
+    const t = tours.get(String(tourId));
+    if (!t || t.status !== 'open') throw new Error('Turnamen tidak bisa dimulai');
+    if (t.host !== token) throw new Error('Hanya penyelenggara yang bisa memulai');
+    if (t.players.length < 2) throw new Error('Butuh minimal 2 pemain');
+    makeBracket(t);
+    t.status = 'running';
+    t.startedAt = now();
+    advance(t);
+    broadcastTours();
+    return { ok: true };
+  },
+
+  tourCancel({ token, tourId }) {
+    const t = tours.get(String(tourId));
+    if (!t || t.status !== 'open') throw new Error('Turnamen yang sudah berjalan tidak bisa dibatalkan');
+    if (t.host !== token) throw new Error('Hanya penyelenggara yang bisa membatalkan');
+    tours.delete(t.id);
+    broadcastTours();
     return { ok: true };
   },
 };
@@ -361,9 +684,15 @@ setInterval(() => {
           continue;
         }
       }
+      if (room.tour && !g.moves.length && t - g.lastMoveAt > TOUR_FIRST_MOVE_MS) {
+        finish(room, '0-1', 'tidakjalan');
+        systemChat(room, `${clients.get(room.white)?.name} tidak melangkah dalam ${TOUR_FIRST_MOVE_MS / 1000} detik.`);
+        pushRoom(room); lobbyChanged = true;
+        continue;
+      }
       for (const [tok, side] of [[room.white, 'w'], [room.black, 'b']]) {
         const c = clients.get(tok);
-        if (!isConnected(tok) && c && t - c.lastSeen > DISCONNECT_LOSS_MS) {
+        if (!isConnected(tok) && c && t - Math.max(c.lastSeen, room.startedAt || 0) > DISCONNECT_LOSS_MS) {
           finish(room, side === 'w' ? '0-1' : '1-0', 'terputus');
           systemChat(room, `${c.name} terputus terlalu lama.`);
           pushRoom(room); lobbyChanged = true;
@@ -375,6 +704,7 @@ setInterval(() => {
     }
   }
   if (lobbyChanged) broadcastLobby();
+  tourTick();
 }, 500);
 
 setInterval(() => {
@@ -442,6 +772,7 @@ const server = http.createServer(async (req, res) => {
     c.streams.add(res);
     c.lastSeen = now();
     sse(res, 'lobby', { rooms: lobbyList(), playing: [...rooms.values()].filter(r => r.status === 'playing').length });
+    pushToursTo(res, token);
     const room = roomOf(token);
     if (room) pushRoom(room); else sse(res, 'noroom', {});
     const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* abaikan */ } }, 15000);
@@ -511,6 +842,7 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
+loadTours();
 server.listen(PORT, HOST, () => {
   console.log('Server catur berjalan. Buka salah satu alamat ini:');
   console.log(`  Komputer ini : http://localhost:${PORT}`);
@@ -528,6 +860,7 @@ server.listen(PORT, HOST, () => {
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
     console.log(`${sig} diterima, server berhenti.`);
+    saveTours(true);
     server.close();
     process.exit(0);
   });

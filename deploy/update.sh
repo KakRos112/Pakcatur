@@ -2,7 +2,8 @@
 # Memperbarui Pakcatur ke versi terbaru dari GitHub lalu me-restart server.
 # Jalankan sebagai root dari dalam folder repo:
 #   bash deploy/update.sh
-# Catatan: lobi & permainan online yang sedang berjalan akan hilang saat restart.
+# Catatan: lobi & permainan online biasa yang sedang berjalan akan hilang saat restart.
+# Turnamen (termasuk pertandingannya) tersimpan di /var/lib/pakcatur dan dilanjutkan.
 set -euo pipefail
 
 # Seluruh isi dibungkus fungsi supaya bash membaca file ini utuh sebelum

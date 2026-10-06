@@ -797,7 +797,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     }
     else el.textContent = ms.textContent = game.pos.inCheck() ? 'Rajamu diskak! Giliranmu.' : 'Giliranmu melangkah.';
     $('btnUndo').disabled = !game.history.some(h => h.color === game.player);
-    $('btnHint').disabled = game.pos.turn !== game.player;
+    $('btnHint').disabled = !hintsOff() && game.pos.turn !== game.player;
     const isOnline = game.mode === 'online';
     $('btnUndo').hidden = $('btnHint').hidden = isOnline;
     $('btnDraw').hidden = !isOnline || !!game.over;
@@ -1613,6 +1613,10 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     });
   }
   $('evalBar').classList.toggle('off', !$('optEval').checked);
+  // "Matikan petunjuk": default tidak dicentang. Hanya bisa diubah di menu, bukan saat bermain.
+  $('optNoHint').checked = store.get('optNoHint', false);
+  $('optNoHint').addEventListener('change', e => { store.set('optNoHint', e.target.checked); updateStatus(); });
+  function hintsOff() { return $('optNoHint').checked; }
 
   // ---------- Simpan otomatis permainan lawan bot (lanjut setelah reload) ----------
   function saveBotGame() {
@@ -1642,11 +1646,12 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
 
   // ---------- Alur permainan ----------
   function newGame(saved) {
-    if (game.mode === 'online') { olApi('leave'); }
+    if (game.mode === 'online') { olApi('leave', { roomId: game.onlineRoom }); }
     game.mode = 'bot';
     hideOffer();
     $('modeTabs').hidden = true;
     $('onlineView').hidden = true;
+    $('tourView').hidden = true;
     resetReview();
     $('btnReviewSide').hidden = true;
     $('btnResign').hidden = false;
@@ -1712,6 +1717,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
       '50langkah': 'aturan 50 langkah', repetisi: 'pengulangan posisi 3 kali', waktu: 'karena waktu habis',
       waktuseri: 'waktu habis, tapi bidak lawan tidak cukup untuk skakmat', menyerah: 'karena menyerah',
       keluar: 'karena keluar dari permainan', terputus: 'karena koneksi terputus terlalu lama', sepakat: 'atas kesepakatan bersama',
+      tidakjalan: 'karena putih tidak melangkah dalam 60 detik',
     };
     let title;
     if (o.result === '1/2-1/2') title = 'Seri';
@@ -1786,12 +1792,12 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     if (video) playResultVideo(video); else sounds.end();
     $('btnReviewSide').hidden = false;
     $('btnResign').hidden = true;
-    $('btnRematch').textContent = game.mode === 'online' ? 'Ajak Main Lagi' : 'Main Lagi';
+    $('btnRematch').textContent = inTourGame() ? 'Lihat Bagan' : game.mode === 'online' ? 'Ajak Main Lagi' : 'Main Lagi';
     updateStatus();
   }
 
   function backToSetup() {
-    if (game.mode === 'online') { olApi('leave'); online.room = null; }
+    if (game.mode === 'online') { olApi('leave', { roomId: game.onlineRoom }); online.room = null; }
     else clearBotGame();
     game.mode = 'bot';
     hideOffer();
@@ -1853,8 +1859,14 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     say('Oke, silakan coba langkah lain.');
   }
 
+  function openHintOff() { $('hintOffModal').hidden = false; $('hintOffOk').focus(); }
+  function closeHintOff() { $('hintOffModal').hidden = true; }
+  $('hintOffOk').onclick = closeHintOff;
+  $('hintOffModal').addEventListener('click', e => { if (e.target.id === 'hintOffModal') closeHintOff(); });
+
   async function showHint() {
     if (game.mode === 'online') return;
+    if (hintsOff() && game.active) { openHintOff(); return; }
     if (!game.active || game.over || game.pos.turn !== game.player || game.view !== null) return;
     const btn = $('btnHint');
     btn.disabled = true;
@@ -2043,7 +2055,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     const k = e.key.length === 1 ? e.key.toLowerCase() : '';
     if (k && k !== 'f' && KEY_BUTTONS[k]) { if (pressShortcut(k)) e.preventDefault(); return; }
     if (e.key === 'Enter' && usable($('btnPlay')) && e.target === document.body) { $('btnPlay').click(); e.preventDefault(); return; }
-    if (e.key === 'Escape' && !$('reviewView').hidden && !special && $('settingsModal').hidden && $('mSheet').hidden) {
+    if (e.key === 'Escape' && !$('reviewView').hidden && !special && $('settingsModal').hidden && $('mSheet').hidden && $('hintOffModal').hidden) {
       if (review && review.done) closeReview(); else $('rvCancel').click();
       return;
     }
@@ -2054,6 +2066,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     else if (e.key === 'ArrowUp') { goTo(0); e.preventDefault(); }
     else if (e.key === 'ArrowDown') { goTo(game.history.length); e.preventDefault(); }
     else if (e.key === 'f' || e.key === 'F') flip();
+    else if (e.key === 'Escape' && !$('hintOffModal').hidden) { closeHintOff(); return; }
     else if (e.key === 'Escape' && !$('settingsModal').hidden) { closeSettings(); return; }
     else if (e.key === 'Escape' && !$('mSheet').hidden) { closeSheet(); return; }
     else if (e.key === 'Escape') { if (special) { exitSpecial(true); return; } selected = -1; premove = null; $('promo').hidden = true; render(); }
@@ -2146,10 +2159,10 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
         + tbBtn('resign', 'flag', resignArmed ? 'Yakin?' : 'Menyerah', false, resignArmed ? 'warn' : '')
         + (game.mode === 'online'
           ? tbBtn('draw', 'half', 'Seri') + tbBtn('chat', 'chat', 'Chat')
-          : tbBtn('hint', 'bulb', 'Petunjuk', game.pos.turn !== game.player || game.view !== null)
+          : tbBtn('hint', 'bulb', 'Petunjuk', !hintsOff() && (game.pos.turn !== game.player || game.view !== null))
             + tbBtn('undo', 'undo', 'Urung', !game.history.some(h => h.color === game.player)));
     } else if (mode === 'over') {
-      html = tbBtn('opts', 'list', 'Pilihan') + tbBtn('rematch', 'plus', game.mode === 'online' ? 'Lagi' : 'Baru') + tbBtn('review', 'search', 'Ulasan')
+      html = tbBtn('opts', 'list', 'Pilihan') + tbBtn('rematch', 'plus', inTourGame() ? 'Bagan' : game.mode === 'online' ? 'Lagi' : 'Baru') + tbBtn('review', 'search', 'Ulasan')
         + tbBtn('prev', 'prev', 'Mundur', idx === 0) + tbBtn('next', 'next', 'Maju', idx >= n);
     } else if (mode === 'review') {
       html = tbBtn('opts', 'list', 'Pilihan') + tbBtn('back', 'back', 'Kembali') + tbBtn('prev', 'prev', 'Mundur', idx === 0)
@@ -2267,7 +2280,10 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     playing: 0,
     room: null,
     chatSeen: 0,
+    tours: [],
+    tourOpen: null,   // id turnamen yang sedang dilihat detailnya
   };
+  const inTourGame = () => game.mode === 'online' && !!(online.room && online.room.tour);
   if (!online.token || !/^[a-f0-9]{32}$/.test(online.token)) {
     const a = new Uint8Array(16);
     crypto.getRandomValues(a);
@@ -2318,6 +2334,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     if (!online.available) return;
     connectOnline();
     renderOnline();
+    renderTour();
   }
 
   function connectOnline() {
@@ -2330,6 +2347,11 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
       renderOnline();
     });
     es.addEventListener('room', e => onRoom(JSON.parse(e.data)));
+    es.addEventListener('tours', e => {
+      online.tours = JSON.parse(e.data).tours;
+      online.toursAt = Date.now();
+      renderTour();
+    });
     es.addEventListener('noroom', () => {
       online.room = null;
       renderOnline();
@@ -2377,13 +2399,14 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     $('promo').hidden = true;
     $('setupView').hidden = true;
     $('onlineView').hidden = true;
+    $('tourView').hidden = true;
     $('gameView').hidden = false;
     $('btnPlay').hidden = true;
     $('modeTabs').hidden = true;
     $('chatAvatar').innerHTML = avatarSVG(game.bot.look);
     $('mChatAvatar').innerHTML = avatarSVG(game.bot.look);
     $('mBubbles').innerHTML = '';
-    $('panelTitle').textContent = 'Online (LAN)';
+    $('panelTitle').textContent = v.tour ? 'Turnamen · ' + (v.tour.round || '') : 'Online';
     say(`Kamu bermain ${game.player === W ? 'putih' : 'hitam'} melawan ${opp.name}. Semoga beruntung!`);
     // Jam mengikuti server
     if (v.clock) {
@@ -2491,23 +2514,27 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
 
   function rematchGame() {
     if (game.mode !== 'online') { newGame(); return; }
+    if (inTourGame()) { online.tourOpen = online.room.tour.id; setupTab = 'tour'; backToSetup(); return; }
     if (online.oppLeft) { showToast('Lawan sudah keluar dari ruangan'); return; }
     olApi('rematch', { action: 'offer' }).then(r => {
       if (r) { showToast('Ajakan main lagi dikirim'); $('gameOver').hidden = true; }
     });
   }
 
-  // ---------- Tab "Lawan Bot" / "Online" & daftar lobi ----------
+  // ---------- Tab "Lawan Bot" / "Online" / "Turnamen" & daftar lobi ----------
   let setupTab = store.get('tab', 'bot');
+  if (!['bot', 'online', 'tour'].includes(setupTab)) setupTab = 'bot';
   function showTab(tab) {
     setupTab = tab;
     store.set('tab', tab);
     for (const b of $('modeTabs').children) b.classList.toggle('active', b.dataset.tab === tab);
     $('setupView').hidden = tab !== 'bot';
     $('onlineView').hidden = tab !== 'online';
+    $('tourView').hidden = tab !== 'tour';
     $('btnPlay').hidden = tab !== 'bot';
-    $('panelTitle').textContent = tab === 'bot' ? 'Lawan Bot' : 'Online (LAN)';
+    $('panelTitle').textContent = { bot: 'Lawan Bot', online: 'Online', tour: 'Turnamen' }[tab] || 'Lawan Bot';
     renderOnline();
+    renderTour();
   }
   $('modeTabs').addEventListener('click', e => {
     const b = e.target.closest('button');
@@ -2547,7 +2574,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   }
 
-  $('olName').addEventListener('change', e => {
+  for (const id of ['olName', 'tvName']) $(id).addEventListener('change', e => {
     online.name = e.target.value.trim().slice(0, 20) || online.name;
     e.target.value = online.name;
     store.set('olName', online.name);
@@ -2569,6 +2596,164 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   $('olList').addEventListener('click', e => {
     const b = e.target.closest('.ol-join');
     if (b) olApi('join', { roomId: b.dataset.id });
+  });
+
+  // ---------- Turnamen (sistem gugur) ----------
+  let tourTimer = null;
+  const TROPHY_ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M6 3h12v2h3v3a4.5 4.5 0 0 1-4.4 4.5 5 5 0 0 1-3.6 3.4V18h3a1 1 0 0 1 1 1v2H7v-2a1 1 0 0 1 1-1h3v-2.1a5 5 0 0 1-3.6-3.4A4.5 4.5 0 0 1 3 8V5h3zM5 7v1a2.5 2.5 0 0 0 1.4 2.2A5 5 0 0 1 6 8.5V7zm13 0v1.5q0 .9-.4 1.7A2.5 2.5 0 0 0 19 8V7z"/></svg>';
+  let tvArmed = null; // tombol Mundur/Batalkan yang menunggu klik kedua: { act, until }
+  const armedLabel = (act, label) => tvArmed && tvArmed.act === act && Date.now() < tvArmed.until ? 'Klik lagi untuk yakin' : label;
+  const myTour = () => online.tours.find(t => t.joined && !t.out && (t.status === 'open' || t.status === 'running'));
+  const secsLeft = ms => Math.max(0, Math.ceil((ms - (Date.now() - online.toursAt)) / 1000));
+
+  // Pertandingan pemain ini yang belum selesai di turnamen yang sedang berjalan
+  function myMatch(t) {
+    for (const r of t.rounds) for (const m of r.matches) {
+      if (!m.winner && ((m.a && m.a.me) || (m.b && m.b.me))) return { r, m, opp: m.a && m.a.me ? m.b : m.a };
+    }
+    return null;
+  }
+
+  function tourStatusText(t) {
+    if (t.status === 'open') return `Pendaftaran · ${t.players.length}/${t.max} pemain`;
+    if (t.status === 'done') return `Selesai · 🏆 ${t.champion ? t.champion.name : '?'}`;
+    const cur = t.rounds.find(r => r.matches.some(m => !m.winner));
+    return `Berlangsung · ${cur ? cur.label : ''}`;
+  }
+
+  function renderTour() {
+    if (game.active) return;
+    $('tvOffline').hidden = online.available;
+    $('tvMain').hidden = !online.available;
+    clearTimeout(tourTimer); tourTimer = null;
+    if (!online.available || setupTab !== 'tour') return;
+    if (document.activeElement !== $('tvName')) $('tvName').value = online.name;
+    // Buka otomatis turnamen yang sedang diikuti
+    let t = online.tours.find(x => x.id === online.tourOpen);
+    if (!t && online.tourOpen === null) t = myTour();
+    $('tvListPage').hidden = !!t;
+    $('tvDetail').hidden = !t;
+    if (!t) { renderTourList(); return; }
+    online.tourOpen = t.id;
+    renderTourDetail(t);
+  }
+
+  function renderTourList() {
+    const mine = myTour();
+    $('tvCreate').disabled = !!mine;
+    $('tvCreate').textContent = mine ? 'Kamu sedang ikut turnamen' : 'Buat Turnamen';
+    $('tvList').innerHTML = online.tours.length ? online.tours.map(t => `
+      <div class="ol-room${t.joined ? ' tv-mine' : ''}">
+        <div class="tv-icon">${TROPHY_ICON}</div>
+        <div class="ol-room-info">
+          <div class="ol-room-name">${escapeHtml(t.name)}</div>
+          <div class="ol-room-meta">${escapeHtml(t.host)} · ${escapeHtml(t.time)}</div>
+          <div class="ol-room-meta">${escapeHtml(tourStatusText(t))}</div>
+        </div>
+        <button class="btn ${t.status === 'open' && !t.joined ? 'green ' : ''}ol-join" data-tour="${t.id}">${t.status === 'open' && !t.joined ? 'Ikut' : 'Lihat'}</button>
+      </div>`).join('') : '<div class="ol-empty">Belum ada turnamen. Buat turnamen, lalu bagikan link game ini ke teman-temanmu.</div>';
+  }
+
+  function renderTourDetail(t) {
+    $('tvTitle').innerHTML = TROPHY_ICON + escapeHtml(t.name);
+    $('tvSub').textContent = `Penyelenggara ${t.host} · ${t.time} · ${tourStatusText(t)}`;
+
+    // Info untuk pemain ini
+    let banner = '', countdown = false;
+    if (t.status === 'open') {
+      banner = !t.joined ? 'Klik <b>Ikut</b> untuk mendaftar.'
+        : t.mine ? (t.players.length < 2 ? 'Tunggu minimal 2 pemain, lalu klik <b>Mulai Turnamen</b>.' : `${t.players.length} pemain siap. Klik <b>Mulai Turnamen</b> kalau semua sudah masuk.`)
+        : 'Kamu sudah terdaftar. Menunggu penyelenggara memulai turnamen…';
+    } else if (t.status === 'done') {
+      banner = `🏆 Juara: <b>${escapeHtml(t.champion ? t.champion.name : '?')}</b>${t.champion && t.champion.me ? ' — selamat, itu kamu!' : ''}`;
+    } else if (t.joined) {
+      const mm = myMatch(t);
+      if (t.out || !mm) banner = 'Kamu sudah tersingkir. Kamu tetap bisa melihat bagannya.';
+      else if (!mm.opp) banner = `Kamu lolos ke ${mm.r.label}. Menunggu lawanmu selesai bertanding…`;
+      else if (mm.m.startIn !== null) {
+        countdown = true;
+        banner = `Pertandinganmu (${mm.r.label}) melawan <b>${escapeHtml(mm.opp.name)}</b> dimulai dalam <b>${secsLeft(mm.m.startIn)}</b> detik.`;
+      } else banner = `Kamu sedang bertanding melawan <b>${escapeHtml(mm.opp.name)}</b>.`;
+    }
+    $('tvBanner').innerHTML = banner;
+    $('tvBanner').hidden = !banner;
+
+    // Tombol
+    const acts = [];
+    if (t.status === 'open') {
+      if (!t.joined) acts.push(`<button class="btn green" data-act="join">Ikut</button>`);
+      if (t.mine) {
+        acts.push(`<button class="btn green" data-act="start"${t.players.length < 2 ? ' disabled' : ''}>Mulai Turnamen</button>`);
+        acts.push(`<button class="btn danger" data-act="cancel">${armedLabel('cancel', 'Batalkan')}</button>`);
+      } else if (t.joined) acts.push(`<button class="btn" data-act="leave">Keluar</button>`);
+    } else if (t.status === 'running' && t.joined && !t.out) {
+      acts.push(`<button class="btn danger" data-act="quit">${armedLabel('quit', 'Mundur')}</button>`);
+    }
+    $('tvActions').innerHTML = acts.join('');
+    $('tvActions').hidden = !acts.length;
+
+    // Peserta (saat pendaftaran) atau bagan (saat berjalan/selesai)
+    $('tvPlayers').innerHTML = t.status === 'open' ? `
+      <div class="ol-head">Peserta <span>${t.players.length}/${t.max}</span></div>
+      <div class="tv-players">${t.players.map(p => `<div class="tv-chip${p.me ? ' me' : ''}"><span class="avatar">${avatarSVG(lookFromName(p.name))}</span>${escapeHtml(p.name)}</div>`).join('')}</div>` : '';
+    $('tvBracket').innerHTML = t.rounds.length ? t.rounds.map(r => `
+      <div class="tv-round">
+        <div class="tv-round-label">${escapeHtml(r.label)}</div>
+        <div class="tv-matches">${r.matches.map(m => matchHtml(m)).join('')}</div>
+      </div>`).join('') : '';
+    $('tvBracket').hidden = !t.rounds.length;
+
+    // Perbarui hitung mundur selama ada pertandingan yang menunggu dimulai
+    if (countdown || t.rounds.some(r => r.matches.some(m => m.startIn !== null && !m.live && !m.winner))) tourTimer = setTimeout(renderTour, 1000);
+  }
+
+  function matchHtml(m) {
+    const side = (p, key) => {
+      if (!p) return `<div class="tv-p empty">${m.bye && key === 'b' ? 'bebas (langsung lolos)' : '…'}</div>`;
+      const cls = (m.winner === key ? ' win' : m.winner ? ' lose' : '') + (p.me ? ' me' : '');
+      return `<div class="tv-p${cls}">${escapeHtml(p.name)}</div>`;
+    };
+    const notes = [];
+    if (m.live) notes.push('<span class="tv-live">● sedang main</span>');
+    else if (m.startIn !== null && !m.winner) notes.push(`mulai ${secsLeft(m.startIn)} dtk`);
+    if (m.draws) notes.push(`seri ${m.draws}×`);
+    if (m.coin) notes.push('diundi');
+    if (m.forfeit) notes.push('lawan mundur');
+    return `<div class="tv-match${m.live ? ' live' : ''}">${side(m.a, 'a')}${side(m.b, 'b')}${notes.length ? `<div class="tv-note-sm">${notes.join(' · ')}</div>` : ''}</div>`;
+  }
+
+  $('tvTime').value = store.get('tvTime', '300+0');
+  $('tvTime').addEventListener('change', e => store.set('tvTime', e.target.value));
+  $('tvCreate').onclick = () => {
+    olApi('tourCreate', { tourName: $('tvTourName').value, time: $('tvTime').value }).then(r => {
+      if (r) { online.tourOpen = r.id; $('tvTourName').value = ''; renderTour(); }
+    });
+  };
+  $('tvList').addEventListener('click', e => {
+    const b = e.target.closest('[data-tour]');
+    if (!b) return;
+    const t = online.tours.find(x => x.id === b.dataset.tour);
+    online.tourOpen = b.dataset.tour;
+    if (t && t.status === 'open' && !t.joined) olApi('tourJoin', { tourId: t.id });
+    renderTour();
+  });
+  $('tvBack').onclick = () => { online.tourOpen = ''; renderTour(); };
+  $('tvActions').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    const tourId = online.tourOpen;
+    if (!b || !tourId) return;
+    const act = b.dataset.act;
+    if ((act === 'quit' || act === 'cancel') && armedLabel(act, '') === '') {
+      tvArmed = { act, until: Date.now() + 3000 };
+      renderTour();
+      setTimeout(renderTour, 3100);
+      return;
+    }
+    tvArmed = null;
+    const api = { join: 'tourJoin', start: 'tourStart', cancel: 'tourCancel', leave: 'tourLeave', quit: 'tourLeave' }[act];
+    olApi(api, { tourId }).then(r => {
+      if (r && (act === 'cancel' || act === 'leave')) { online.tourOpen = ''; renderTour(); }
+    });
   });
 
   // ---------- Mulai ----------

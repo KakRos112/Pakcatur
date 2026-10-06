@@ -4,3 +4,5 @@ _uji*
 node_modules/
 .DS_Store
 Thumbs.db
+# Data turnamen saat server dijalankan tanpa systemd
+data/

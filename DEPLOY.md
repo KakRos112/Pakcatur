@@ -157,7 +157,8 @@ bash deploy/update.sh
 
 Skrip ini menjalankan `git pull`, memasang ulang service, lalu me-restart server.
 
-> Restart menghapus semua lobi dan permainan online yang sedang berjalan, karena datanya hanya disimpan di memori. Lakukan saat tidak ada yang sedang main.
+> Restart menghapus lobi dan permainan online biasa yang sedang berjalan, karena datanya hanya disimpan di memori. Lakukan saat tidak ada yang sedang main.
+> Turnamen tidak hilang: disimpan di `/var/lib/pakcatur/turnamen.json` dan dilanjutkan setelah server menyala lagi (waktu selama server mati tidak dihitung).
 
 ---
 

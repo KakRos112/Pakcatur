@@ -9,6 +9,7 @@ Game catur hiburan di browser: lawan 13 bot (rating 250–3000), ulasan permaina
 - **Lawan bot**: 13 bot dari pemula sampai master. Bot kuat memakai mesin [Stockfish 10](https://github.com/niklasf/stockfish.js) yang berjalan langsung di browser.
 - **Ulasan permainan**: label tiap langkah (Brilian, Terbaik, Blunder, dan lainnya), akurasi, grafik evaluasi, penjelasan langkah, variasi terbaik, dan mode "Coba Lagi".
 - **Online**: buat lobi, gabung, chat, tawarkan seri, main lagi.
+- **Turnamen**: sistem gugur sampai 32 pemain dengan bagan, seri = main ulang dengan warna ditukar. Tetap tersimpan walau server di-restart.
 - Premove, petunjuk, ambil kembali, jam catur, 8 tema papan, 7 set bidak, layar penuh, shortcut keyboard, dan tampilan khusus HP.
 
 ## Menjalankan

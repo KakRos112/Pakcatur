@@ -763,16 +763,27 @@ select {
 }
 
 /* ---------- Online (LAN) ---------- */
-.mode-tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--panel-2); padding: 0 12px; gap: 4px; }
+.mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--panel-2); padding: 0 12px; gap: 4px; }
 .mode-tabs button {
   border: 0;
   background: none;
-  padding: 10px 6px;
+  padding: 10px 2px;
   font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
   color: var(--muted);
   border-bottom: 3px solid transparent;
 }
 .mode-tabs button.active { color: var(--text); border-bottom-color: var(--green); }
+/* Ikon solid (warna mengikuti teks) */
+.ico { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+.mode-tabs button, #btnTheme { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.tv-icon .ico { width: 22px; height: 22px; color: #e8b923; }
+.tv-title { display: flex; align-items: center; gap: 6px; }
+.tv-title .ico { width: 20px; height: 20px; color: #e8b923; }
+.small-card { width: min(380px, 100%); }
+.small-card p { margin: 0; line-height: 1.5; color: var(--muted); }
+.small-card p b { color: var(--text); }
 .text-input {
   width: 100%;
   padding: 10px 12px;
@@ -798,6 +809,34 @@ select {
 .ol-offline { line-height: 1.5; font-size: 14px; }
 .ol-offline pre { background: var(--panel-2); padding: 10px 12px; border-radius: 6px; font-size: 13px; }
 .ol-chat { display: flex; gap: 6px; margin-top: 10px; }
+
+/* ---------- Turnamen ---------- */
+.tv-icon { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; background: var(--panel-2); border-radius: 6px; }
+.ol-room.tv-mine { box-shadow: inset 3px 0 0 var(--green); }
+.tv-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 12px 0 0; }
+.btn.tv-back { width: auto; padding: 6px 10px; font-size: 13px; margin-bottom: 12px; }
+.tv-title { font-size: 18px; font-weight: 800; overflow-wrap: anywhere; }
+.tv-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.tv-banner { background: var(--card); border-radius: 6px; padding: 10px 12px; margin-top: 12px; font-size: 14px; line-height: 1.45; }
+#tvActions { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.tv-players { display: flex; flex-wrap: wrap; gap: 6px; }
+.tv-chip { display: flex; align-items: center; gap: 6px; background: var(--card); border-radius: 999px; padding: 3px 10px 3px 3px; font-size: 13px; max-width: 100%; }
+.tv-chip .avatar { width: 24px; height: 24px; flex-shrink: 0; }
+.tv-chip.me { box-shadow: inset 0 0 0 2px var(--green); }
+.tv-bracket { display: flex; gap: 10px; overflow-x: auto; margin-top: 16px; padding-bottom: 6px; }
+.tv-round { flex: 0 0 128px; display: flex; flex-direction: column; }
+.tv-round-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.tv-matches { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 8px; }
+.tv-match { background: var(--card); border-radius: 6px; overflow: hidden; font-size: 13px; }
+.tv-match.live { box-shadow: inset 0 0 0 2px var(--green); }
+.tv-p { padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-p + .tv-p { border-top: 1px solid var(--panel-2); }
+.tv-p.win { font-weight: 800; color: var(--green); }
+.tv-p.lose { color: var(--muted); text-decoration: line-through; }
+.tv-p.me { background: rgba(129, 182, 76, .14); }
+.tv-p.empty { color: var(--muted); font-style: italic; }
+.tv-note-sm { font-size: 11px; color: var(--muted); padding: 3px 8px 5px; background: var(--panel-2); }
+.tv-live { color: var(--green); font-weight: 700; }
 .ol-chat .btn { padding: 8px 12px; }
 .offer-bar {
   position: fixed;
@@ -882,19 +921,16 @@ select {
 .panel-head { position: relative; }
 .about-btn {
   position: absolute;
-  right: 12px;
+  right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid var(--muted);
+  width: 18px;
+  height: 18px;
   color: var(--muted);
-  font: italic 700 14px/22px Georgia, "Times New Roman", serif;
-  text-align: center;
-  text-decoration: none;
+  display: flex;
 }
-.about-btn:hover { color: var(--text); border-color: var(--text); }
+.about-btn svg { width: 100%; height: 100%; fill: currentColor; }
+.about-btn:hover { color: var(--text); }
 .about-link { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); text-align: center; }
 .about-link:hover { color: var(--text); }
 

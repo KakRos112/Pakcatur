@@ -15,6 +15,8 @@ Environment=TRUST_PROXY=1
 ExecStart=__NODE__ __APP_DIR__/server.js
 Restart=always
 RestartSec=3
+# Turnamen disimpan di /var/lib/pakcatur (dibuat otomatis oleh systemd, bisa ditulis oleh service)
+StateDirectory=pakcatur
 # Pengamanan ringan yang tetap jalan di LXC unprivileged
 NoNewPrivileges=true
 
