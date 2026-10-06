@@ -2024,7 +2024,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   const KEY_BUTTONS = {
     h: ['btnHint'], u: ['btnUndo'], p: ['btnPgn'], d: ['btnDraw'], r: ['btnResign'],
     n: ['btnRematch', 'rvRematch', 'btnNew'], g: ['btnGameReview', 'btnReviewSide'],
-    b: ['rvBest'], c: ['rvRetry'], t: ['btnSettings'], l: ['btnFull'],
+    b: ['rvBest'], c: ['rvRetry'], t: ['btnSettings'], l: ['btnFull'], i: ['btnAbout'],
   };
   const usable = el => el && !el.disabled && el.offsetParent !== null && !el.closest('[hidden]');
   function pressShortcut(key) {
@@ -2224,6 +2224,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
       ['sound', `Suara: ${$('optSound').checked ? 'Aktif' : 'Mati'}`],
       ['hints', `Tampilkan langkah sah: ${$('optHints').checked ? 'Aktif' : 'Mati'}`],
       ...(isOnline && !game.over ? [['draw', 'Tawarkan Seri']] : []),
+      ['about', 'Tentang Pakcatur & Kredit'],
       ['newbot', isOnline ? 'Keluar Ruangan' : game.active && !game.over ? 'Akhiri & Ganti Bot' : 'Ganti Bot'],
     ];
     $('mSheetItems').innerHTML = items.map(([a, l]) => `<button class="sheet-item" data-act="${a}">${l}</button>`).join('');
@@ -2251,6 +2252,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
       case 'hints': toggle('optHints'); break;
       case 'newbot': closeSheet(); backToSetup(); break;
       case 'draw': closeSheet(); offerDraw(); break;
+      case 'about': closeSheet(); window.open('about.html', '_blank', 'noopener'); break;
     }
   });
 

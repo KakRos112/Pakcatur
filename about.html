@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tentang Pakcatur</title>
+  <meta name="description" content="Tentang Pakcatur: mesin catur yang dipakai, pengembangnya, lisensi, dan semua sumber referensi.">
+  <link rel="icon" href="pieces/wN.svg">
+  <link rel="stylesheet" href="css/about.css?v=12">
+</head>
+<body>
+  <header class="top">
+    <a class="back" href="index.html">← Kembali ke game</a>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <img src="pieces/wN.svg" alt="" width="64" height="64">
+      <div>
+        <h1>Tentang Pakcatur</h1>
+        <p class="lead">Game catur hiburan di browser: lawan bot, ulasan permainan, dan main bareng teman.</p>
+      </div>
+    </section>
+
+    <section class="card notice">
+      <h2>Siapa pembuatnya?</h2>
+      <p>
+        Saya <strong>hanya mengemas</strong> berbagai karya open source menjadi satu game hiburan yang mudah dimainkan.
+        <strong>Saya bukan insinyur utama maupun pembuat mesin caturnya.</strong>
+        Kecerdasan bot berasal dari <strong>Stockfish</strong>, mesin catur open source yang dikembangkan
+        bertahun-tahun oleh komunitas programmer dan pecatur dari seluruh dunia.
+      </p>
+      <p>
+        Kode tampilan, aturan, dan server game ini ditulis dengan bantuan asisten AI
+        <a href="https://claude.com/claude-code" rel="noopener" target="_blank">Claude Code</a> dari Anthropic,
+        lalu disusun dan diuji oleh pengemas.
+      </p>
+      <dl class="facts">
+        <dt>Dikemas oleh</dt>
+        <dd><a href="https://github.com/KakRos112" rel="noopener" target="_blank">KakRos112</a></dd>
+        <dt>Repositori game</dt>
+        <dd><a href="https://github.com/KakRos112/Pakcatur" rel="noopener" target="_blank">github.com/KakRos112/Pakcatur</a></dd>
+        <dt>Lisensi</dt>
+        <dd><a href="LICENSE" target="_blank">GNU GPL v3.0</a> · <a href="CREDITS.txt" target="_blank">CREDITS.txt</a></dd>
+      </dl>
+    </section>
+
+    <section class="card">
+      <h2>Mesin catur: Stockfish</h2>
+      <p>
+        Bot dengan rating 1200 ke atas memakai <strong>Stockfish 10</strong> versi JavaScript
+        (<code>stockfish.js 10.0.2</code>). Mesin ini berjalan langsung di browser kamu lewat Web Worker,
+        dan juga dipakai untuk bar evaluasi, petunjuk langkah, serta Ulasan Permainan.
+      </p>
+      <dl class="facts">
+        <dt>Pengembang Stockfish</dt>
+        <dd>Tord Romstad, Marco Costalba, Joona Kiiski, Gary Linscott, dan ratusan kontributor</dd>
+        <dt>Versi JavaScript</dt>
+        <dd>Niklas Fiekas (dikompilasi dengan Emscripten)</dd>
+        <dt>Dasar kode</dt>
+        <dd>Fork multi-varian oleh Daniel Dugovic dan kontributor</dd>
+        <dt>Lisensi</dt>
+        <dd>GNU GPL v3.0</dd>
+      </dl>
+      <ul class="links">
+        <li><a href="https://stockfishchess.org" rel="noopener" target="_blank">stockfishchess.org</a> — situs resmi Stockfish</li>
+        <li><a href="https://github.com/official-stockfish/Stockfish" rel="noopener" target="_blank">github.com/official-stockfish/Stockfish</a> — kode sumber resmi</li>
+        <li><a href="https://github.com/niklasf/stockfish.js" rel="noopener" target="_blank">github.com/niklasf/stockfish.js</a> — versi JavaScript yang dipakai</li>
+        <li><a href="https://github.com/ddugovic/Stockfish" rel="noopener" target="_blank">github.com/ddugovic/Stockfish</a> — fork multi-varian</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Mesin bawaan untuk bot pemula</h2>
+      <p>
+        Bot level rendah (dan cadangan saat Stockfish gagal dimuat) memakai mesin kecil yang ditulis khusus untuk game ini
+        (<code>js/ai.js</code>). Mesin ini menerapkan teknik klasik pemrograman catur yang dijelaskan di Chess Programming Wiki:
+        alpha-beta, quiescence search, transposition table, null-move pruning, dan late move reduction.
+        Bot pemula sengaja diberi "salah hitung" acak supaya terasa seperti manusia yang baru belajar.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Gambar bidak</h2>
+      <p>Semua set bidak diambil dari repositori <a href="https://github.com/lichess-org/lila" rel="noopener" target="_blank">Lichess</a> dan tidak diubah.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Set di game</th><th>Pembuat</th><th>Lisensi</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Klasik (cburnett)</td><td>Colin M.L. Burnett</td><td>GPL-2.0+</td></tr>
+            <tr><td>Merida</td><td>Armando Hernandez Marroquin</td><td>GPL-2.0+</td></tr>
+            <tr><td>Chessnut</td><td><a href="https://github.com/LexLuengas/chessnut-pieces" rel="noopener" target="_blank">Alexis Luengas</a></td><td>Apache-2.0</td></tr>
+            <tr><td>Fantasi, Celtic, Spatial</td><td><a href="https://github.com/maurimo/chess-art" rel="noopener" target="_blank">Maurizio Monge</a></td><td>MIT</td></tr>
+            <tr><td>Piksel (rhosgfx)</td><td><a href="https://rhosgfx.itch.io/" rel="noopener" target="_blank">RhosGFX</a></td><td>CC0 1.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Sumber referensi</h2>
+      <h3>Catur &amp; mesin catur</h3>
+      <ul class="links">
+        <li><a href="https://www.chessprogramming.org/Main_Page" rel="noopener" target="_blank">Chess Programming Wiki</a> — teknik pencarian langkah (alpha-beta, quiescence, null move, LMR, transposition table)</li>
+        <li><a href="https://www.chessprogramming.org/Simplified_Evaluation_Function" rel="noopener" target="_blank">Simplified Evaluation Function</a> (Tomasz Michniewski) — tabel nilai posisi bidak di mesin bawaan</li>
+        <li><a href="https://www.chessprogramming.org/0x88" rel="noopener" target="_blank">Papan 0x88</a> — cara menyimpan papan dan membuat langkah di <code>js/core.js</code></li>
+        <li><a href="https://www.chessprogramming.org/Perft_Results" rel="noopener" target="_blank">Perft Results</a> — posisi uji untuk memastikan semua aturan langkah benar</li>
+        <li><a href="https://www.chessprogramming.org/Zobrist_Hashing" rel="noopener" target="_blank">Zobrist Hashing</a> — deteksi pengulangan posisi</li>
+        <li><a href="https://www.chessprogramming.org/UCI" rel="noopener" target="_blank">Universal Chess Interface (UCI)</a> — protokol komunikasi dengan Stockfish</li>
+        <li><a href="https://handbook.fide.com/chapter/E012023" rel="noopener" target="_blank">FIDE Laws of Chess</a> — aturan resmi: rokade, en passant, promosi, seri 50 langkah, pengulangan 3 kali</li>
+      </ul>
+      <h3>Ulasan permainan</h3>
+      <ul class="links">
+        <li><a href="https://lichess.org/page/accuracy" rel="noopener" target="_blank">Lichess: Accuracy</a> — rumus persentase menang dan akurasi langkah</li>
+        <li>Label langkah (Brilian, Terbaik, Blunder, dan lainnya) terinspirasi dari fitur Game Review di chess.com; aturan penilaiannya dibuat sendiri</li>
+        <li>Nama pembukaan mengikuti istilah umum dunia catur (klasifikasi ECO)</li>
+      </ul>
+      <h3>Teknologi web</h3>
+      <ul class="links">
+        <li><a href="https://developer.mozilla.org/docs/Web/API/Web_Workers_API" rel="noopener" target="_blank">Web Workers</a> — menjalankan mesin catur tanpa membuat halaman macet</li>
+        <li><a href="https://developer.mozilla.org/docs/Web/API/Server-sent_events" rel="noopener" target="_blank">Server-Sent Events</a> — lobi dan langkah mode online</li>
+        <li><a href="https://developer.mozilla.org/docs/Web/API/Web_Audio_API" rel="noopener" target="_blank">Web Audio API</a> — efek suara tanpa file audio</li>
+        <li><a href="https://developer.mozilla.org/docs/Web/API/Fullscreen_API" rel="noopener" target="_blank">Fullscreen API</a> — tombol layar penuh</li>
+        <li><a href="https://nodejs.org" rel="noopener" target="_blank">Node.js</a> — menjalankan <code>server.js</code> untuk mode online</li>
+        <li><a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/" rel="noopener" target="_blank">Cloudflare Tunnel</a> — membuka server ke internet (lihat DEPLOY.md)</li>
+      </ul>
+      <h3>Desain</h3>
+      <ul class="links">
+        <li>Tampilan dan alur bermain terinspirasi dari <a href="https://www.chess.com" rel="noopener" target="_blank">chess.com</a> dan <a href="https://lichess.org" rel="noopener" target="_blank">lichess.org</a>, tapi semua gambar avatar dan kodenya dibuat sendiri</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Catatan</h2>
+      <ul class="plain">
+        <li>Pakcatur <strong>tidak berafiliasi</strong> dengan chess.com, Lichess, FIDE, maupun proyek Stockfish.</li>
+        <li>Nama bot memakai nama tokoh publik hanya untuk hiburan. Kalimat sapaannya karangan, bukan kutipan asli, dan avatarnya kartun umum yang tidak dibuat mirip wajah aslinya.</li>
+        <li>Rating bot hanya perkiraan dan tidak setara dengan rating resmi mana pun.</li>
+      </ul>
+    </section>
+
+    <section class="card closing">
+      <div class="closing-icon" aria-hidden="true">♟️</div>
+      <h2>Selamat bermain!</h2>
+      <p>
+        Game ini dibuat untuk <strong>hiburan</strong>. Mainkan dengan santai, jangan terlalu serius, biar nggak stres.
+        Kalah atau menang itu biasa, yang penting pikiran fresh dan hati senang.
+        Semoga kamu menikmati setiap langkahnya. 😊
+      </p>
+      <a class="btn" href="index.html">Ayo Main</a>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Pakcatur · dikemas oleh KakRos112 · GPL-3.0
+  </footer>
+</body>
+</html>
