@@ -20,7 +20,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Pakcatur: ikon kuda catur dan tulisan Main catur gratis di browser">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/style.css?v=12">
+  <link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
   <main class="app">
@@ -115,14 +115,17 @@
 
       <!-- Tahap pilih bot -->
       <div class="panel-body" id="setupView">
-        <div class="bot-hero">
-          <div class="avatar huge" id="heroAvatar"></div>
-          <div>
-            <div class="hero-name"><span id="heroName"></span> <span class="rating" id="heroRating"></span></div>
-            <div class="hero-level" id="heroLevel"></div>
+        <!-- Bot terpilih tetap terlihat saat daftar bot digulir -->
+        <div class="hero-sticky" id="heroSticky">
+          <div class="bot-hero">
+            <div class="avatar huge" id="heroAvatar"></div>
+            <div>
+              <div class="hero-name"><span id="heroName"></span> <span class="rating" id="heroRating"></span></div>
+              <div class="hero-level" id="heroLevel"></div>
+            </div>
           </div>
+          <div class="bubble" id="heroQuote"></div>
         </div>
-        <div class="bubble" id="heroQuote"></div>
         <div class="bot-groups" id="botGroups"></div>
 
         <div class="options">
@@ -311,9 +314,9 @@ node server.js</pre>
     </div>
   </div>
 
-  <script src="js/core.js?v=12"></script>
-  <script src="js/ai.js?v=12"></script>
-  <script src="engine/stockfish-src.js?v=12" defer></script>
-  <script src="js/app.js?v=12" defer></script>
+  <script src="js/core.js?v=13"></script>
+  <script src="js/ai.js?v=13"></script>
+  <script src="engine/stockfish-src.js?v=13" defer></script>
+  <script src="js/app.js?v=13" defer></script>
 </body>
 </html>

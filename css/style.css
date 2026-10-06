@@ -897,3 +897,31 @@ select {
 .about-btn:hover { color: var(--text); border-color: var(--text); }
 .about-link { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); text-align: center; }
 .about-link:hover { color: var(--text); }
+
+/* ---------- Bot terpilih menempel di atas daftar bot ---------- */
+.hero-sticky {
+  position: sticky;
+  /* minus padding panel, supaya tidak ada celah di atas */
+  top: -16px;
+  z-index: 4;
+  margin: -16px -16px 0;
+  padding: 16px 16px 2px;
+  background: var(--panel);
+}
+/* Bayangan halus supaya daftar bot terlihat "lewat di bawah" */
+.hero-sticky::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -12px;
+  height: 12px;
+  background: linear-gradient(var(--panel), transparent);
+  pointer-events: none;
+}
+.hero-sticky .bubble { margin-bottom: 12px; }
+
+@media (max-width: 760px) {
+  /* overflow:hidden pada panel membuat elemen sticky tidak bisa menempel */
+  .panel { overflow: visible; }
+  .hero-sticky .avatar.huge { width: 64px; height: 64px; }
+  .hero-sticky .bubble { margin: 10px 0; }
+}
