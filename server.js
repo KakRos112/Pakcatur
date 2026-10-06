@@ -1,6 +1,11 @@
-// Server LAN untuk game catur: menyajikan file game + lobi & sinkronisasi langkah antar pemain.
+// Server game catur: menyajikan file game + lobi & sinkronisasi langkah antar pemain.
 // Jalankan:  node server.js   lalu buka http://<ip-komputer>:3000 dari perangkat di jaringan yang sama.
 // Tidak butuh paket tambahan: komunikasi memakai Server-Sent Events (server -> pemain) dan POST (pemain -> server).
+//
+// Variabel lingkungan (opsional):
+//   PORT=3000          port HTTP
+//   HOST=0.0.0.0       alamat yang didengarkan; pakai 127.0.0.1 jika diakses lewat Cloudflare Tunnel / reverse proxy
+//   TRUST_PROXY=1      percayai header CF-Connecting-IP / X-Forwarded-For untuk IP asli pemain
 'use strict';
 const http = require('http');
 const fs = require('fs');
@@ -10,7 +15,27 @@ const os = require('os');
 const crypto = require('crypto');
 
 const PORT = +process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const ROOT = __dirname;
+
+// Hanya file game ini yang boleh diunduh (bukan .git, server.js, skrip deploy, dll.)
+const PUBLIC_FILE = /^\/(?:index\.html|CREDITS\.txt|LICENSE|(?:css|js|engine|pieces|licenses)\/[\w.-]+(?:\/[\w.-]+)?)$/;
+
+// Batas sederhana supaya server tidak mudah dibanjiri saat dibuka ke internet
+const MAX_ROOMS = 300;
+const MAX_STREAMS_TOTAL = 2000;
+const MAX_STREAMS_PER_IP = 20;
+const MAX_POSTS_PER_MIN = 300;
+const CLIENT_TTL_MS = 60 * 60000;   // data pemain yang tidak aktif dihapus setelah 1 jam
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+};
+const CSP = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; "
+  + "img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 // Aturan catur yang sama dengan di browser, untuk memvalidasi setiap langkah
 vm.runInThisContext(fs.readFileSync(path.join(ROOT, 'js', 'core.js'), 'utf8'));
@@ -191,6 +216,7 @@ const handlers = {
   create({ token, name, color, time, roomName }) {
     const c = client(token, name);
     leaveRoom(token);
+    if (rooms.size >= MAX_ROOMS) throw new Error('Server sedang penuh, coba lagi nanti');
     const tc = String(time || '0');
     let t = null;
     if (tc !== '0') {
@@ -350,6 +376,14 @@ setInterval(() => {
   if (lobbyChanged) broadcastLobby();
 }, 500);
 
+setInterval(() => {
+  const t = now();
+  for (const [token, c] of clients) {
+    if (!c.streams.size && t - c.lastSeen > CLIENT_TTL_MS && !roomOf(token)) clients.delete(token);
+  }
+  for (const [ip, e] of postCounts) if (t > e.reset) postCounts.delete(ip);
+}, 60000);
+
 // ---------- HTTP ----------
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -361,23 +395,48 @@ function readBody(req) {
 }
 
 function json(res, status, obj) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(obj));
+}
+
+function clientIp(req) {
+  if (TRUST_PROXY) {
+    const h = req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (h) return h;
+  }
+  return req.socket.remoteAddress || '?';
+}
+
+const postCounts = new Map();   // ip -> { count, reset }
+const streamsPerIp = new Map(); // ip -> jumlah koneksi SSE
+let streamsTotal = 0;
+function postAllowed(ip) {
+  const t = now();
+  let e = postCounts.get(ip);
+  if (!e || t > e.reset) { e = { count: 0, reset: t + 60000 }; postCounts.set(ip, e); }
+  return ++e.count <= MAX_POSTS_PER_MIN;
 }
 
 const validToken = t => typeof t === 'string' && /^[a-f0-9]{16,64}$/.test(t);
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://localhost');
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); } catch { res.writeHead(400); return res.end(); }
   const p = url.pathname;
+  const ip = clientIp(req);
 
   if (p === '/api/ping') return json(res, 200, { ok: true });
 
   if (p === '/api/events' && req.method === 'GET') {
     const token = url.searchParams.get('token');
     if (!validToken(token)) return json(res, 400, { error: 'Token tidak valid' });
+    if (streamsTotal >= MAX_STREAMS_TOTAL || (streamsPerIp.get(ip) || 0) >= MAX_STREAMS_PER_IP) {
+      return json(res, 429, { error: 'Terlalu banyak koneksi' });
+    }
+    streamsTotal++;
+    streamsPerIp.set(ip, (streamsPerIp.get(ip) || 0) + 1);
     const c = client(token, url.searchParams.get('name'));
-    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     res.write('retry: 2000\n\n');
     c.streams.add(res);
     c.lastSeen = now();
@@ -387,6 +446,9 @@ const server = http.createServer(async (req, res) => {
     const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* abaikan */ } }, 15000);
     req.on('close', () => {
       clearInterval(ping);
+      streamsTotal--;
+      const n = (streamsPerIp.get(ip) || 1) - 1;
+      if (n > 0) streamsPerIp.set(ip, n); else streamsPerIp.delete(ip);
       c.streams.delete(res);
       c.lastSeen = now();
       const r = roomOf(token);
@@ -399,6 +461,7 @@ const server = http.createServer(async (req, res) => {
     const name = p.slice(5);
     const fn = Object.prototype.hasOwnProperty.call(handlers, name) && handlers[name];
     if (!fn) return json(res, 404, { error: 'Tidak ditemukan' });
+    if (!postAllowed(ip)) return json(res, 429, { error: 'Terlalu banyak permintaan, tunggu sebentar' });
     try {
       const body = await readBody(req);
       if (!validToken(body.token)) return json(res, 400, { error: 'Token tidak valid' });
@@ -412,24 +475,43 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
 
-  // File statis
-  let rel = decodeURIComponent(p);
+  // File statis (hanya yang cocok dengan PUBLIC_FILE)
+  let rel;
+  try { rel = decodeURIComponent(p); } catch { res.writeHead(400, SECURITY_HEADERS); return res.end(); }
   if (rel === '/') rel = '/index.html';
   const file = path.normalize(path.join(ROOT, rel));
-  if (!file.startsWith(ROOT + path.sep) || path.basename(file) === 'server.js') { res.writeHead(403); return res.end(); }
+  if (!PUBLIC_FILE.test(rel) || rel.includes('..') || !file.startsWith(ROOT + path.sep)) {
+    res.writeHead(404, SECURITY_HEADERS); return res.end('Tidak ditemukan');
+  }
   fs.stat(file, (err, st) => {
-    if (err || !st.isFile()) { res.writeHead(404); return res.end('Tidak ditemukan'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Content-Length': st.size, 'Cache-Control': 'no-cache' });
+    if (err || !st.isFile()) { res.writeHead(404, SECURITY_HEADERS); return res.end('Tidak ditemukan'); }
+    const ext = path.extname(file).toLowerCase();
+    const headers = { ...SECURITY_HEADERS, 'Content-Type': MIME[ext] || 'text/plain; charset=utf-8', 'Content-Length': st.size, 'Cache-Control': 'no-cache' };
+    if (ext === '.html') headers['Content-Security-Policy'] = CSP;
+    res.writeHead(200, headers);
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, HOST, () => {
   console.log('Server catur berjalan. Buka salah satu alamat ini:');
   console.log(`  Komputer ini : http://localhost:${PORT}`);
-  for (const list of Object.values(os.networkInterfaces())) {
-    for (const a of list || []) if (a.family === 'IPv4' && !a.internal) console.log(`  Jaringan     : http://${a.address}:${PORT}`);
+  if (HOST === '0.0.0.0') {
+    for (const list of Object.values(os.networkInterfaces())) {
+      for (const a of list || []) if (a.family === 'IPv4' && !a.internal) console.log(`  Jaringan     : http://${a.address}:${PORT}`);
+    }
+  } else {
+    console.log(`  (hanya mendengarkan di ${HOST}; akses dari luar lewat proxy / Cloudflare Tunnel)`);
   }
   console.log('Tekan Ctrl+C untuk berhenti.');
 });
+
+// Berhenti dengan rapi saat dihentikan systemd (SIGTERM) atau Ctrl+C
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    console.log(`${sig} diterima, server berhenti.`);
+    server.close();
+    process.exit(0);
+  });
+}

@@ -1,0 +1,20 @@
+# Contoh konfigurasi Cloudflare Tunnel yang dikelola lewat file (bukan lewat dashboard).
+# Hanya perlu jika kamu TIDAK memakai cara "token dari dashboard" di DEPLOY.md.
+# Simpan sebagai /etc/cloudflared/config.yml lalu:  cloudflared service install
+#
+# Ganti:
+#   <TUNNEL-ID>        -> ID tunnel dari:  cloudflared tunnel create pakcatur
+#   catur.domainmu.com -> subdomain yang ingin dipakai
+#   localhost:3000     -> alamat server Pakcatur (pakai IP LXC jika cloudflared berada di LXC lain)
+
+tunnel: <TUNNEL-ID>
+credentials-file: /etc/cloudflared/<TUNNEL-ID>.json
+
+ingress:
+  - hostname: catur.domainmu.com
+    service: http://localhost:3000
+    originRequest:
+      # Server-Sent Events (lobi & langkah online) butuh koneksi yang tetap terbuka
+      keepAliveTimeout: 90s
+      disableChunkedEncoding: false
+  - service: http_status:404
