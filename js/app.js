@@ -1719,7 +1719,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     return { title, reason: reasons[o.reason] || '' };
   }
 
-  // ---------- Video kartu hasil (skakmat) ----------
+  // ---------- Video kartu hasil (menang/kalah) ----------
   // Ganti nama file di sini kalau nanti ada video kalah tersendiri.
   const RESULT_VIDEO = { win: 'media/skak.mp4', lose: 'media/skak.mp4' };
   const resultVideo = $('resultVideo');
@@ -1780,7 +1780,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
       const playerWon = (result === '1-0') === (game.player === W);
       if (game.mode === 'bot') say(pick(playerWon ? LINES.win : LINES.lose));
       setEval(result === '1-0' ? 30000 : -30000, 0);
-      if (reason === 'skakmat') video = RESULT_VIDEO[playerWon ? 'win' : 'lose'];
+      video = RESULT_VIDEO[playerWon ? 'win' : 'lose'];
     }
     if (video) playResultVideo(video); else sounds.end();
     $('btnReviewSide').hidden = false;
