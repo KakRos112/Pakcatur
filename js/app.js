@@ -285,6 +285,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   let orientation = W;
   let selected = -1;
   let hintMove = null;
+  let corr = null;   // hasil Koreksi: { idx, cls, best, text }
   const marks = { arrows: new Map(), squares: new Set() };
 
   // ---------- Papan ----------
@@ -431,6 +432,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     let html = arrowsEl.querySelector('defs').outerHTML;
     for (const [, a] of marks.arrows) html += arrowSVG(a.from, a.to, 'user');
     if (hintMove) html += arrowSVG(hintMove.from, hintMove.to, 'hint');
+    if (corrActive() && corr.best) html += arrowSVG(corr.best.from, corr.best.to, 'best');
     const ra = reviewArrow();
     if (ra) html += arrowSVG(ra.from, ra.to, 'best');
     arrowsEl.innerHTML = html;
@@ -488,6 +490,8 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     if ($('promo').hidden === false || !$('gameOver').hidden) return;
     const sq = pointToSq(e.clientX, e.clientY);
     if (sq < 0) return;
+    // Sedang melihat hasil Koreksi: ketuk papan untuk kembali ke posisi terkini
+    if (e.button === 0 && corrActive() && game.view !== null) { goTo(game.history.length); return; }
     if (e.button === 2) { if (premove) { cancelPremove(); return; } drag = { right: true, from: sq }; return; }
     if (e.button !== 0) return;
     if (marks.arrows.size || marks.squares.size) { marks.arrows.clear(); marks.squares.clear(); renderArrows(); renderHighlights(); }
@@ -615,7 +619,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     game.history.push({ m, uci: pos.toUci(m), san, from, to, color });
     game.fens.push(pos.fen());
     if (game.mode === 'online' && !fromServer && color === game.player) olApi('move', { uci: pos.toUci(m), gameNo: game.onlineNo });
-    hintMove = null;
+    hintMove = null; corr = null;
     marks.arrows.clear(); marks.squares.clear();
 
     const anim = [];
@@ -783,8 +787,10 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     const ms = $('mStatus');
     syncMobile();
     if (!game.active) { el.textContent = ''; ms.textContent = ''; return; }
+    $('btnCorrect').disabled = !hintsOff() && !canCorrect();
+    $('btnCorrect').hidden = game.mode === 'online';
     if (game.over) {
-      el.textContent = ms.textContent = resultText().title + ' — ' + resultText().reason;
+      el.textContent = ms.textContent = corrActive() ? corr.text : resultText().title + ' — ' + resultText().reason;
       $('btnDraw').hidden = true;
       $('olChatForm').hidden = game.mode !== 'online';
       return;
@@ -796,6 +802,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
         : `Menunggu langkah ${game.bot.name}<span class="dots"></span>`;
     }
     else el.textContent = ms.textContent = game.pos.inCheck() ? 'Rajamu diskak! Giliranmu.' : 'Giliranmu melangkah.';
+    if (corrActive()) el.textContent = ms.textContent = corr.text;
     $('btnUndo').disabled = !game.history.some(h => h.color === game.player);
     $('btnHint').disabled = !hintsOff() && game.pos.turn !== game.player;
     const isOnline = game.mode === 'online';
@@ -849,10 +856,12 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     i = Math.max(0, Math.min(game.history.length, i));
     game.view = i === game.history.length ? null : i;
     selected = -1;
+    if (corr && i !== corr.idx) corr = null;
     render();
     renderMoveList();
     renderCaptured();
     if (review && review.done) updateReviewInfo();
+    updateStatus();
   }
 
   // ---------- Ulasan permainan ----------
@@ -1457,8 +1466,9 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     const badge = $('clsBadge');
     const on = review && review.done && !$('reviewView').hidden && idx > 0 && !special;
     boardEl.style.removeProperty('--last-move');
-    if (!on) { badge.hidden = true; return; }
-    const mv = game.history[idx - 1], c = CLS[review.moves[idx - 1].cls];
+    const byCorr = !on && corrActive();
+    if (!on && !byCorr) { badge.hidden = true; return; }
+    const mv = game.history[idx - 1], c = CLS[byCorr ? corr.cls : review.moves[idx - 1].cls];
     const { col, row } = sqToCell(mv.to);
     badge.hidden = false;
     badge.textContent = c.sym;
@@ -1669,7 +1679,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     game.view = null;
     game.thinking = false;
     game.active = true;
-    selected = -1; hintMove = null; premove = null;
+    selected = -1; hintMove = null; corr = null; premove = null;
     marks.arrows.clear(); marks.squares.clear();
     orientation = game.player;
     $('gameOver').hidden = true;
@@ -1812,7 +1822,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     game.over = null;
     game.pos = new C.Position();
     game.history = []; game.fens = [C.START_FEN]; game.view = null;
-    selected = -1; hintMove = null; premove = null;
+    selected = -1; hintMove = null; corr = null; premove = null;
     orientation = W;
     $('topClock').hidden = $('bottomClock').hidden = true;
     $('gameOver').hidden = true;
@@ -1849,7 +1859,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
       $('btnResign').hidden = false;
       if (game.clock) { game.clock.running = game.history.length > 0; game.clock.last = Date.now(); }
     }
-    game.view = null; selected = -1; hintMove = null; premove = null;
+    game.view = null; selected = -1; hintMove = null; corr = null; premove = null;
     render();
     renderMoveList();
     renderCaptured();
@@ -1877,6 +1887,65 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     hintMove = { from: parseSq(res.best.slice(0, 2)), to: parseSq(res.best.slice(2, 4)) };
     renderHighlights();
     renderArrows();
+  }
+
+  // ---------- Koreksi: menilai langkah terakhir pemain ----------
+  function corrActive() {
+    return !!corr && currentIdx() === corr.idx && !special && $('reviewView').hidden;
+  }
+  function lastPlayerMove() {
+    for (let i = game.history.length - 1; i >= 0; i--) if (game.history[i].color === game.player) return i;
+    return -1;
+  }
+  function canCorrect() {
+    return game.active && game.mode !== 'online' && !game.thinking && lastPlayerMove() >= 0
+      && (!!game.over || game.pos.turn === game.player);
+  }
+
+  async function showCorrection() {
+    if (game.mode === 'online' || !game.active) return;
+    if (hintsOff()) { openHintOff(); return; }
+    if (!canCorrect()) return;
+    const k = lastPlayerMove(), mv = game.history[k], me = game.player;
+    const btn = $('btnCorrect');
+    btn.disabled = true;
+    const token = game.token, n = game.history.length;
+    const ucis = game.history.map(h => h.uci);
+    const pre = new C.Position(game.fens[k]), post = new C.Position(game.fens[k + 1]);
+    const legal = pre.legalMoves();
+    const res = await analyse(game.startFen, ucis.slice(0, k), 1200);
+    const st = post.status();
+    const res2 = st.over ? null : await analyse(game.startFen, ucis.slice(0, k + 1), 800);
+    if (token !== game.token || n !== game.history.length || !res || !res.best || (!st.over && !res2)) { updateStatus(); return; }
+
+    const persp = w => me === W ? w : 100 - w;
+    const before = persp(evalOfResult(res, me).win);
+    const after = st.over ? (st.reason === 'skakmat' ? 100 : 50) : persp(evalOfResult(res2, -me).win);
+    const loss = Math.max(0, before - after);
+    const isBest = res.best === mv.uci;
+    let cls;
+    if (legal.length === 1) cls = 'forced';
+    else if (isBest || loss < 0.5 || (st.over && st.reason === 'skakmat')) cls = 'best';
+    else if (loss < 2) cls = 'excellent';
+    else if (loss < 5) cls = 'good';
+    else if (loss < 10) cls = 'inaccuracy';
+    else if (loss < 20) cls = 'mistake';
+    else cls = 'blunder';
+
+    const bm = legal.find(m => pre.toUci(m) === res.best);
+    const bestSan = bm ? pre.san(bm, legal) : res.best;
+    const c = CLS[cls];
+    let text;
+    if (cls === 'forced') text = `${mv.san} adalah satu-satunya langkah yang sah.`;
+    else if (cls === 'best') text = `${c.sym} ${mv.san} adalah langkah terbaik. Mantap!`;
+    else text = `${c.sym} ${mv.san}: ${c.label}. Langkah terbaik ${bestSan} (panah hijau).`;
+    if (k + 1 < game.history.length) text += ' Ketuk papan untuk lanjut.';
+    corr = {
+      idx: k + 1, cls, text,
+      best: ['best', 'forced'].includes(cls) ? null : { from: parseSq(res.best.slice(0, 2)), to: parseSq(res.best.slice(2, 4)) },
+    };
+    hintMove = null;
+    goTo(k + 1);
   }
 
   function pgn() {
@@ -1934,6 +2003,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   $('rvCancel').onclick = () => { reviewToken++; for (const e of [engines.sfEval, engines.sfBot]) if (e) e.cancel(); review = null; closeReview(); };
   $('btnUndo').onclick = takeback;
   $('btnHint').onclick = showHint;
+  $('btnCorrect').onclick = showCorrection;
   $('btnFlip').onclick = flip;
   $('btnResign').onclick = () => {
     if (!game.active || game.over) return;
@@ -2036,7 +2106,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   const KEY_BUTTONS = {
     h: ['btnHint'], u: ['btnUndo'], p: ['btnPgn'], d: ['btnDraw'], r: ['btnResign'],
     n: ['btnRematch', 'rvRematch', 'btnNew'], g: ['btnGameReview', 'btnReviewSide'],
-    b: ['rvBest'], c: ['rvRetry'], t: ['btnSettings'], l: ['btnFull'], i: ['btnAbout'],
+    b: ['rvBest'], c: ['rvRetry', 'btnCorrect'], t: ['btnSettings'], l: ['btnFull'], i: ['btnAbout'],
   };
   const usable = el => el && !el.disabled && el.offsetParent !== null && !el.closest('[hidden]');
   function pressShortcut(key) {
@@ -2126,6 +2196,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
   const ICONS = {
     list: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>',
     flag: '<svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+    check: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16 9.5"/></svg>',
     bulb: '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.4.4.6.9.6 1.4V16h6v-.8c0-.5.2-1 .6-1.4A6 6 0 0 0 12 3z"/></svg>',
     undo: '<svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
     plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
@@ -2160,6 +2231,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
         + (game.mode === 'online'
           ? tbBtn('draw', 'half', 'Seri') + tbBtn('chat', 'chat', 'Chat')
           : tbBtn('hint', 'bulb', 'Petunjuk', !hintsOff() && (game.pos.turn !== game.player || game.view !== null))
+            + tbBtn('corr', 'check', 'Koreksi', !hintsOff() && !canCorrect())
             + tbBtn('undo', 'undo', 'Urung', !game.history.some(h => h.color === game.player)));
     } else if (mode === 'over') {
       html = tbBtn('opts', 'list', 'Pilihan') + tbBtn('rematch', 'plus', inTourGame() ? 'Bagan' : game.mode === 'online' ? 'Lagi' : 'Baru') + tbBtn('review', 'search', 'Ulasan')
@@ -2214,6 +2286,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
         }
         break;
       case 'hint': showHint(); break;
+      case 'corr': showCorrection(); break;
       case 'undo': takeback(); break;
       case 'rematch': rematchGame(); break;
       case 'draw': offerDraw(); break;
@@ -2391,7 +2464,7 @@ const r=A.search(p,d.opts);postMessage({id:d.id,best:r.move?p.toUci(r.move):null
     game.view = null;
     game.thinking = false;
     game.active = true;
-    selected = -1; hintMove = null; premove = null;
+    selected = -1; hintMove = null; corr = null; premove = null;
     marks.arrows.clear(); marks.squares.clear();
     orientation = game.player;
     online.chatSeen = 0;
